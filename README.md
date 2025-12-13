@@ -11,7 +11,7 @@ Rig creates isolated Docker containers pre-configured with your language runtime
 - **VS Code in Browser** — Optional code-server with language extensions, auto-configured
 - **Testcontainers Support** — Docker-in-Docker works out of the box
 - **Persistent Sessions** — Your container persists between sessions; instant startup after first build
-- **Auto-Rebuild** — Change your config, and the image rebuilds automatically
+- **Auto-Rebuild** — Change your config, and the image rebuilds automatically next time you enter.
 
 ## Quick Start
 
