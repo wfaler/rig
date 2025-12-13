@@ -9,7 +9,7 @@ Rig creates isolated Docker containers pre-configured with your language runtime
 - **Zero Setup** — Define your stack in YAML, run `rig`, and you're coding
 - **AI Agents Ready** — Claude Code, Gemini CLI, OpenAI Codex and GitHub CLI pre-installed
 - **VS Code in Browser** — Optional code-server with language extensions, auto-configured
-- **Testcontainers Support** — Docker-in-Docker works out of the box
+- **Testcontainers Support** — Docker-in-Docker works out of the box (**without** needing privileged mode)
 - **Persistent Sessions** — Your container persists between sessions; instant startup after first build
 - **Auto-Rebuild** — Change your config, and the image rebuilds automatically next time you enter.
 
