@@ -25,10 +25,10 @@ var SupportedShells = map[string]bool{
 	"fish": true,
 }
 
-// GetShell returns the configured shell, defaulting to bash
+// GetShell returns the configured shell, defaulting to zsh (with oh-my-zsh)
 func (c *Config) GetShell() string {
 	if c.Shell == "" {
-		return "bash"
+		return "zsh"
 	}
 	return c.Shell
 }

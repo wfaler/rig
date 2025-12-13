@@ -311,9 +311,9 @@ func TestGetShell(t *testing.T) {
 		want   string
 	}{
 		{
-			name:   "empty defaults to bash",
+			name:   "empty defaults to zsh",
 			config: Config{},
-			want:   "bash",
+			want:   "zsh",
 		},
 		{
 			name:   "bash explicitly set",
@@ -321,7 +321,7 @@ func TestGetShell(t *testing.T) {
 			want:   "bash",
 		},
 		{
-			name:   "zsh",
+			name:   "zsh explicitly set",
 			config: Config{Shell: "zsh"},
 			want:   "zsh",
 		},

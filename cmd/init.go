@@ -57,8 +57,8 @@ env: {}
   # API_KEY: "${API_KEY}"
   # DATABASE_URL: "postgres://localhost:5432/dev"
 
-# Default shell: bash, zsh (with oh-my-zsh), or fish
-# shell: bash
+# Default shell: zsh (default, with oh-my-zsh), bash, or fish
+# shell: zsh
 
 # VS Code in browser (code-server)
 # code_server:

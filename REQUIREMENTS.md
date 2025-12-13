@@ -94,7 +94,7 @@ env:
   SECRET: "${HOST_SECRET}"
 
 # Default shell
-shell: bash                      # bash (default), zsh (with oh-my-zsh), fish
+shell: zsh                       # zsh with oh-my-zsh (default), bash, fish
 
 # VS Code in browser
 code_server:
@@ -109,8 +109,8 @@ code_server:
 
 | Shell | Value | Notes |
 |-------|-------|-------|
-| Bash | `bash` | Default shell |
-| Zsh | `zsh` | Includes Oh My Zsh |
+| Zsh | `zsh` | Default, includes Oh My Zsh |
+| Bash | `bash` | Standard bash |
 | Fish | `fish` | Fish shell |
 
 ### Supported Languages

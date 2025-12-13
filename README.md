@@ -49,7 +49,7 @@ ports:
 env:
   API_KEY: "${API_KEY}"  # Expands from host environment
 
-shell: zsh  # bash (default), zsh (with oh-my-zsh), or fish
+shell: zsh  # zsh with oh-my-zsh (default), bash, or fish
 
 code_server:
   enabled: true

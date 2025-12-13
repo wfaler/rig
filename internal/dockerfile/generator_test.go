@@ -148,8 +148,8 @@ func TestGenerateDockerfileStructure(t *testing.T) {
 	// Should contain WORKDIR /workspace
 	assert.Contains(t, dockerfile, "WORKDIR /workspace")
 
-	// Should end with CMD
-	assert.Contains(t, dockerfile, `CMD ["/bin/bash"]`)
+	// Should end with CMD (default shell is zsh)
+	assert.Contains(t, dockerfile, `CMD ["/bin/zsh"]`)
 
 	// Should install Mise
 	assert.Contains(t, dockerfile, "curl https://mise.run")
@@ -258,10 +258,27 @@ func TestGenerateWithShellConfiguration(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name: "default bash shell",
+			name: "default zsh shell with oh-my-zsh",
 			config: &config.Config{
 				Languages: map[string]config.LanguageConfig{},
 				Env:       map[string]string{},
+			},
+			wantContains: []string{
+				"useradd -m -s /bin/zsh developer",
+				`CMD ["/bin/zsh"]`,
+				`mise activate zsh`,
+				"ohmyzsh",
+			},
+			wantNotContain: []string{
+				"fish",
+			},
+		},
+		{
+			name: "bash shell explicitly set",
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{},
+				Env:       map[string]string{},
+				Shell:     "bash",
 			},
 			wantContains: []string{
 				"useradd -m -s /bin/bash developer",
