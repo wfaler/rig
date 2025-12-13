@@ -65,22 +65,18 @@ RUN useradd -m -s /bin/bash developer \
 RUN groupadd -f docker && usermod -aG docker developer
 
 # Create entrypoint script to fix Docker socket permissions and start services
-RUN cat > /usr/local/bin/docker-entrypoint.sh << 'ENTRYPOINT_EOF'
-#!/bin/bash
-# Fix Docker socket permissions - make it accessible to developer user
-if [ -S /var/run/docker.sock ]; then
-  sudo chmod 666 /var/run/docker.sock
-fi
-
-# Start code-server in background if installed
-if command -v code-server &> /dev/null; then
-  code-server --bind-addr 0.0.0.0:${CODE_SERVER_PORT:-8080} --auth none > /tmp/code-server.log 2>&1 &
-  echo "code-server started on http://localhost:${CODE_SERVER_PORT:-8080}"
-fi
-
-exec "$@"
-ENTRYPOINT_EOF
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+RUN printf '%s\n' '#!/bin/bash' \
+    '# Fix Docker socket permissions' \
+    'if [ -S /var/run/docker.sock ]; then' \
+    '  sudo chmod 666 /var/run/docker.sock' \
+    'fi' \
+    '# Start code-server in background if installed' \
+    'if command -v code-server > /dev/null 2>&1; then' \
+    '  code-server --bind-addr 0.0.0.0:${CODE_SERVER_PORT:-8080} --auth none > /tmp/code-server.log 2>&1 &' \
+    '  echo "code-server started on http://localhost:${CODE_SERVER_PORT:-8080}"' \
+    'fi' \
+    'exec "$@"' > /usr/local/bin/docker-entrypoint.sh \
+    && chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 
@@ -124,6 +120,10 @@ RUN mkdir -p /home/developer/.config/code-server \
     && echo 'bind-addr: 0.0.0.0:{{ .CodeServerPort }}' > /home/developer/.config/code-server/config.yaml \
     && echo 'auth: none' >> /home/developer/.config/code-server/config.yaml \
     && echo 'cert: false' >> /home/developer/.config/code-server/config.yaml
+
+# Configure VS Code settings (theme)
+RUN mkdir -p /home/developer/.local/share/code-server/User \
+    && echo '{"workbench.colorTheme": "{{ .CodeServerTheme }}"}' > /home/developer/.local/share/code-server/User/settings.json
 
 {{ if .CodeServerExtensions }}
 # Install VS Code extensions for configured languages

@@ -1,107 +1,158 @@
-# Devbox - AI Agent Development Sandbox
+# Devbox Technical Specification
 
-A dockerized development sandbox for AI agents (Claude, Gemini, Codex, GitHub CLI).
+This document serves as the technical reference for devbox internals and configuration options.
 
-## Technology
+## Architecture
 
-- **Language**: Golang
-- **Base Docker Image**: `debian:bookworm-slim` (lightweight, glibc-based, good compatibility)
+### Technology Stack
+
+- **Language**: Go 1.22+
+- **CLI Framework**: Cobra
+- **Container Runtime**: Docker (via Docker SDK for Go)
+- **Base Image**: `debian:bookworm-slim`
+
+### Version Managers
+
+| Tool | Languages/Tools |
+|------|-----------------|
+| [Mise](https://mise.jdx.dev/) | Go, Node, Python, Ruby, Rust |
+| [SDKMAN](https://sdkman.io/) | Java, Gradle, Maven, SBT, Ant |
+
+Java defaults to Temurin (Eclipse Adoptium) distribution.
+
+---
 
 ## CLI Commands
 
-- `devbox` - Enter the container with bash (creates/starts container if needed)
-- `devbox init` - Initialize a new workspace with an empty `.assistant.yml` file
-- `devbox rebuild` - Force a clean rebuild (removes container and image, rebuilds from scratch)
+| Command | Description |
+|---------|-------------|
+| `devbox` | Enter container with bash (creates/starts if needed) |
+| `devbox init` | Create `.assistant.yml` template in current directory |
+| `devbox rebuild` | Force clean rebuild (removes container + image) |
+
+---
 
 ## Container Behavior
 
-- **Persistence**: Containers are persistent between sessions (not ephemeral)
-- **Image naming**: `devbox-<project-directory-name>:<config-hash>`
-  - Tag is a truncated SHA256 hash of `.assistant.yml` content
-  - Automatically rebuilds when config changes
-- **Build**: Uses existing image if available, builds if it doesn't exist or config changed
-- **Mounting**: Current directory is mounted; container cannot escape via `cd ../`
-- **Docker-in-Docker**: Supported for running testcontainers tests
-- **Networking**: Full external internet access
+### Lifecycle
 
-## Agent Installation
+- **Persistent**: Containers are reused across sessions (not ephemeral)
+- **Auto-rebuild**: Image rebuilds when `.assistant.yml` content changes
+- **Named**: Container named `devbox-<project-directory>`
 
-AI agents (Claude, Gemini, Codex, GitHub CLI) are installed via npm during Docker build.
+### Image Tagging
 
-## `.assistant.yml` Configuration
+```
+devbox-<project>:<hash>
+```
+
+- `<project>`: Current directory name
+- `<hash>`: First 12 characters of SHA256 hash of `.assistant.yml`
+
+### Mounts
+
+| Host | Container | Purpose |
+|------|-----------|---------|
+| Current directory | `/workspace` | Project files |
+| `/var/run/docker.sock` | `/var/run/docker.sock` | Docker-in-Docker |
+
+### Networking
+
+- Full external internet access
+- `host.docker.internal` resolves to host machine
+- Configured ports exposed to host
+
+### Entrypoint
+
+The container entrypoint:
+1. Fixes Docker socket permissions (`chmod 666`)
+2. Starts code-server if installed
+3. Executes the requested command
+
+---
+
+## Configuration Reference
+
+### `.assistant.yml` Schema
+
+```yaml
+# Language runtimes
+languages:
+  <language>:
+    version: "<version>"                    # "lts", "latest", or specific
+    build_system: "<system>"                # optional
+    build_system_version: "<version>"       # optional
+
+# Port mappings
+ports:
+  - "<host>:<container>"   # explicit mapping
+  - "<port>"               # same on both
+
+# Environment variables (supports ${VAR} expansion)
+env:
+  KEY: "value"
+  SECRET: "${HOST_SECRET}"
+
+# VS Code in browser
+code_server:
+  enabled: true|false
+  port: 8080                    # default: 8080, auto-exposed
+  theme: "Default Dark Modern"  # VS Code theme name
+  extensions:                   # additional extensions
+    - extension.id
+```
 
 ### Supported Languages
 
-One version per language (no multi-version support):
+| Language | Key | Versions | Build Systems |
+|----------|-----|----------|---------------|
+| Node.js | `node` | `lts`, `latest`, `20`, `20.10.0` | `npm`, `yarn`, `pnpm` |
+| Python | `python` | `latest`, `3.12`, `3.12.1` | `pip`, `poetry`, `pipenv` |
+| Go | `go` | `latest`, `1.22`, `1.22.1` | (built-in) |
+| Java | `java` | `latest`, `21`, `17` | `gradle`, `maven`, `sbt`, `ant` |
+| Rust | `rust` | `latest`, `1.75`, `1.75.0` | `cargo` |
+| Ruby | `ruby` | `latest`, `3.3`, `3.3.0` | `bundler`, `gem` |
 
-| Language | Build Systems |
-|----------|---------------|
-| Go | (built-in) |
-| Node | npm, yarn, pnpm |
-| Rust | cargo |
-| Java/JVM | Gradle, Maven, Ant, SBT |
-| Python | pip, poetry, pipenv |
-| Ruby | bundler, gem |
+### Code Server Extensions
 
-### Version Specification
+Auto-installed based on configured languages:
 
-- Specific version: `"20.10.0"`
-- LTS: `"lts"`
-- Latest: `"latest"` (default if not specified)
+| Language | Extensions |
+|----------|------------|
+| Go | `golang.go` |
+| Node | `dbaeumer.vscode-eslint`, `esbenp.prettier-vscode`, `ms-vscode.vscode-typescript-next` |
+| Python | `ms-python.python`, `ms-python.vscode-pylance`, `ms-python.debugpy` |
+| Java | `redhat.java`, `vscjava.vscode-java-debug`, `vscjava.vscode-java-dependency`, `vscjava.vscode-maven`, `vscjava.vscode-gradle` |
+| Rust | `rust-lang.rust-analyzer` |
+| Ruby | `shopify.ruby-lsp` |
 
-### Build System Versions
+---
 
-Optional. If not specified, uses latest or version defined in project files.
+## Pre-installed Tools
 
-### Port Configuration
+### System Packages
 
-Uses Docker's `host:container` format:
-
-```yaml
-ports:
-  - "8080:8080"    # explicit host:container mapping
-  - "3000"         # shorthand: same port on both host and container
+```
+ca-certificates curl wget git build-essential openssh-client
+gnupg lsb-release sudo gosu vim less jq unzip zip procps
+libssl-dev zlib1g-dev libbz2-dev libreadline-dev libsqlite3-dev libffi-dev
 ```
 
-### Environment Variables
+### Docker & GitHub CLI
 
-Custom environment variables can be defined for API keys, etc.
+- `docker-ce-cli` (Docker CLI for DinD)
+- `gh` (GitHub CLI)
 
-### Agent Configuration
+### AI Agent CLIs
 
-Out of scope - agent-specific config files should be placed in the project directory (mounted into container).
+Installed via npm:
+- `@anthropic-ai/claude-code` (Claude Code)
+- `@google/gemini-cli` (Gemini CLI)
+- `openai` (OpenAI CLI)
 
-### Code Server (VS Code in Browser)
+---
 
-Optional. Set `code_server: true` to install code-server with language-specific extensions.
-
-```yaml
-code_server: true       # Install VS Code in browser
-code_server_port: 8080  # Optional, defaults to 8080
-```
-
-When enabled:
-- Installs code-server (VS Code accessible via browser)
-- Configures **no password authentication** (suitable for local development)
-- **Starts automatically** when the container runs
-- Port is automatically exposed (no need to add to `ports` manually)
-- Installs language extensions based on configured languages
-
-**Usage:** Just run any devbox command and open the browser:
-```bash
-devbox bash
-# code-server is already running at http://localhost:8080
-```
-
-**Language extensions installed:**
-- Go: `golang.go`
-- Node: `dbaeumer.vscode-eslint`, `esbenp.prettier-vscode`, `ms-vscode.vscode-typescript-next`
-- Python: `ms-python.python`, `ms-python.vscode-pylance`, `ms-python.debugpy`
-- Java: `redhat.java`, `vscjava.vscode-java-debug`, `vscjava.vscode-java-dependency`, `vscjava.vscode-maven`, `vscjava.vscode-gradle`
-- Rust: `rust-lang.rust-analyzer`
-- Ruby: `shopify.ruby-lsp`
-
-## Example `.assistant.yml`
+## Example Configuration
 
 ```yaml
 languages:
@@ -124,25 +175,75 @@ env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
   DATABASE_URL: "postgres://localhost:5432/dev"
 
-code_server: true        # Optional: VS Code in browser (auto-starts, port auto-exposed)
-# code_server_port: 9000 # Optional: custom port (default: 8080)
+code_server:
+  enabled: true
+  theme: "Default Dark Modern"
+  extensions:
+    - github.copilot
+    - eamodio.gitlens
 ```
 
-## Implementation Notes
+---
 
-- Use Go templates for generating Dockerfile (no intermediate files written to disk if possible)
-- Executable runs Docker directly with correct parameters (no batch/shell scripts)
-- Basic development tooling (git, bash tools, curl, etc.) pre-installed in base image
+## Environment Variables
 
-## Language/Tool Installation
+### Set in Container
 
-Languages and build tools are installed using modern version managers for flexibility:
+| Variable | Value | Purpose |
+|----------|-------|---------|
+| `DOCKER_HOST` | `unix:///var/run/docker.sock` | Docker daemon location |
+| `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE` | `/var/run/docker.sock` | Testcontainers config |
+| `TESTCONTAINERS_HOST_OVERRIDE` | `host.docker.internal` | Testcontainers host resolution |
+| `TESTCONTAINERS_RYUK_DISABLED` | `true` | Disable Ryuk cleanup container |
+| `CODE_SERVER_PORT` | (configured port) | Code-server port (if enabled) |
 
-| Tool | Languages/Tools | Why |
-|------|-----------------|-----|
-| [Mise](https://mise.jdx.dev/) | Go, Node, Python, Ruby, Rust | Polyglot version manager, consistent `mise use --global <lang>@<version>` syntax |
-| [SDKMAN](https://sdkman.io/) | Java, Gradle, Maven, SBT, Ant | Best-in-class JVM toolchain manager, handles distribution variants (e.g., Temurin) |
+---
 
-- Java versions default to Temurin (Eclipse Adoptium) distribution
-- Node.js is always installed (required for AI agent CLIs)
-- Mise and SDKMAN are auto-configured in `.bashrc` for interactive sessions
+## Project Structure
+
+```
+devbox/
+├── main.go                      # Entry point
+├── cmd/
+│   ├── root.go                  # Root command, enters container
+│   ├── init.go                  # devbox init
+│   ├── rebuild.go               # devbox rebuild
+│   └── session.go               # Container session orchestration
+├── internal/
+│   ├── config/
+│   │   ├── config.go            # Config struct, parsing, validation
+│   │   └── config_test.go
+│   ├── docker/
+│   │   ├── client.go            # Docker SDK client wrapper
+│   │   ├── image.go             # Image build/check/remove
+│   │   ├── container.go         # Container lifecycle
+│   │   ├── attach.go            # TTY attachment
+│   │   └── interfaces.go        # DockerClient interface
+│   ├── dockerfile/
+│   │   ├── generator.go         # Template execution
+│   │   ├── generator_test.go
+│   │   ├── template.go          # Embedded Dockerfile template
+│   │   ├── languages.go         # Language/build system installers
+│   │   └── languages_test.go
+│   └── project/
+│       ├── project.go           # Project naming, hash computation
+│       └── project_test.go
+├── REQUIREMENTS.md              # This file
+├── README.md                    # User documentation
+├── Makefile
+└── go.mod
+```
+
+---
+
+## Adding New Languages
+
+1. Add to `SupportedLanguages` map in `internal/config/config.go`
+2. Add build systems to `BuildSystemsForLanguage` in `internal/config/config.go`
+3. Add installer function in `internal/dockerfile/languages.go`
+4. Add VS Code extensions to `VSCodeExtensionsForLanguage` in `internal/dockerfile/languages.go`
+5. Add tests
+
+## Adding New AI Agents
+
+1. Add npm package to AI agents install line in `internal/dockerfile/template.go`

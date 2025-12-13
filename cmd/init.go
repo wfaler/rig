@@ -57,9 +57,14 @@ env: {}
   # API_KEY: "${API_KEY}"
   # DATABASE_URL: "postgres://localhost:5432/dev"
 
-# code_server: true
-  # Install code-server (VS Code in browser) with language-specific extensions
-  # Access at http://localhost:8080 (add "8080" to ports if needed)
+# VS Code in browser (code-server)
+# code_server:
+#   enabled: true
+#   port: 8080                           # default: 8080
+#   theme: "Default Dark Modern"         # VS Code theme
+#   extensions:                          # additional extensions to install
+#     - github.copilot
+#     - eamodio.gitlens
 `
 
 func runInit(cmd *cobra.Command, args []string) error {
@@ -80,6 +85,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Created %s\n", project.ConfigFileName)
 	fmt.Println("Edit this file to configure your development environment, then run:")
-	fmt.Println("  devbox claude   # or gemini, codex, gh, bash")
+	fmt.Println("  devbox")
 	return nil
 }

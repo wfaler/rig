@@ -18,6 +18,7 @@ type TemplateData struct {
 	Env                  map[string]string
 	CodeServer           bool
 	CodeServerPort       int
+	CodeServerTheme      string
 	CodeServerExtensions []string
 }
 
@@ -45,8 +46,11 @@ func Generate(cfg *config.Config) (string, error) {
 
 	// Get VS Code extensions for configured languages if code-server is enabled
 	var extensions []string
-	if cfg.CodeServer {
+	if cfg.IsCodeServerEnabled() {
+		// Add language-specific extensions
 		extensions = GetExtensionsForLanguages(languages)
+		// Add custom extensions from config
+		extensions = append(extensions, cfg.GetCodeServerExtensions()...)
 	}
 
 	data := TemplateData{
@@ -55,8 +59,9 @@ func Generate(cfg *config.Config) (string, error) {
 		HasNode:              cfg.HasLanguage("node"),
 		HasJava:              cfg.HasLanguage("java"),
 		Env:                  cfg.Env,
-		CodeServer:           cfg.CodeServer,
+		CodeServer:           cfg.IsCodeServerEnabled(),
 		CodeServerPort:       cfg.GetCodeServerPort(),
+		CodeServerTheme:      cfg.GetCodeServerTheme(),
 		CodeServerExtensions: extensions,
 	}
 

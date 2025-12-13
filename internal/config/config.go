@@ -11,19 +11,47 @@ import (
 
 // Config represents the .assistant.yml file
 type Config struct {
-	Languages      map[string]LanguageConfig `yaml:"languages"`
-	Ports          []string                  `yaml:"ports"`
-	Env            map[string]string         `yaml:"env"`
-	CodeServer     bool                      `yaml:"code_server"`      // Install code-server with language extensions
-	CodeServerPort int                       `yaml:"code_server_port"` // Port for code-server (default: 8080)
+	Languages  map[string]LanguageConfig `yaml:"languages"`
+	Ports      []string                  `yaml:"ports"`
+	Env        map[string]string         `yaml:"env"`
+	CodeServer *CodeServerConfig         `yaml:"code_server"`
+}
+
+// CodeServerConfig defines code-server (VS Code in browser) settings
+type CodeServerConfig struct {
+	Enabled    bool     `yaml:"enabled"`    // Enable code-server
+	Port       int      `yaml:"port"`       // Port for code-server (default: 8080)
+	Theme      string   `yaml:"theme"`      // VS Code theme (default: "Default Dark Modern")
+	Extensions []string `yaml:"extensions"` // Additional extensions to install
+}
+
+// IsCodeServerEnabled returns true if code-server is enabled
+func (c *Config) IsCodeServerEnabled() bool {
+	return c.CodeServer != nil && c.CodeServer.Enabled
 }
 
 // GetCodeServerPort returns the code-server port, defaulting to 8080
 func (c *Config) GetCodeServerPort() int {
-	if c.CodeServerPort == 0 {
+	if c.CodeServer == nil || c.CodeServer.Port == 0 {
 		return 8080
 	}
-	return c.CodeServerPort
+	return c.CodeServer.Port
+}
+
+// GetCodeServerTheme returns the code-server theme, defaulting to "Default Dark Modern"
+func (c *Config) GetCodeServerTheme() string {
+	if c.CodeServer == nil || c.CodeServer.Theme == "" {
+		return "Default Dark Modern"
+	}
+	return c.CodeServer.Theme
+}
+
+// GetCodeServerExtensions returns additional extensions to install
+func (c *Config) GetCodeServerExtensions() []string {
+	if c.CodeServer == nil {
+		return nil
+	}
+	return c.CodeServer.Extensions
 }
 
 // GetAllPorts returns all configured ports, including code-server port if enabled
@@ -31,7 +59,7 @@ func (c *Config) GetAllPorts() []string {
 	ports := make([]string, len(c.Ports))
 	copy(ports, c.Ports)
 
-	if c.CodeServer {
+	if c.IsCodeServerEnabled() {
 		csPort := fmt.Sprintf("%d", c.GetCodeServerPort())
 		// Check if port is already in the list
 		found := false

@@ -165,9 +165,8 @@ func TestGenerateWithCodeServer(t *testing.T) {
 		{
 			name: "code-server disabled (default)",
 			config: &config.Config{
-				Languages:  map[string]config.LanguageConfig{"go": {Version: "1.22"}},
-				Env:        map[string]string{},
-				CodeServer: false,
+				Languages: map[string]config.LanguageConfig{"go": {Version: "1.22"}},
+				Env:       map[string]string{},
 			},
 			wantNotContain: []string{
 				"code-server.dev/install.sh",
@@ -179,7 +178,7 @@ func TestGenerateWithCodeServer(t *testing.T) {
 			config: &config.Config{
 				Languages:  map[string]config.LanguageConfig{"go": {Version: "1.22"}},
 				Env:        map[string]string{},
-				CodeServer: true,
+				CodeServer: &config.CodeServerConfig{Enabled: true},
 			},
 			wantContains: []string{
 				"code-server.dev/install.sh",
@@ -194,7 +193,7 @@ func TestGenerateWithCodeServer(t *testing.T) {
 					"python": {Version: "3.12"},
 				},
 				Env:        map[string]string{},
-				CodeServer: true,
+				CodeServer: &config.CodeServerConfig{Enabled: true},
 			},
 			wantContains: []string{
 				"code-server.dev/install.sh",
@@ -203,17 +202,28 @@ func TestGenerateWithCodeServer(t *testing.T) {
 			},
 		},
 		{
-			name: "code-server enabled with no languages",
+			name: "code-server enabled with custom extensions",
 			config: &config.Config{
-				Languages:  map[string]config.LanguageConfig{},
+				Languages:  map[string]config.LanguageConfig{"go": {Version: "1.22"}},
 				Env:        map[string]string{},
-				CodeServer: true,
+				CodeServer: &config.CodeServerConfig{Enabled: true, Extensions: []string{"github.copilot"}},
 			},
 			wantContains: []string{
 				"code-server.dev/install.sh",
+				"--install-extension golang.go",
+				"--install-extension github.copilot",
 			},
-			wantNotContain: []string{
-				"--install-extension", // No extensions if no languages
+		},
+		{
+			name: "code-server with custom theme",
+			config: &config.Config{
+				Languages:  map[string]config.LanguageConfig{},
+				Env:        map[string]string{},
+				CodeServer: &config.CodeServerConfig{Enabled: true, Theme: "Monokai"},
+			},
+			wantContains: []string{
+				"code-server.dev/install.sh",
+				`"workbench.colorTheme": "Monokai"`,
 			},
 		},
 	}

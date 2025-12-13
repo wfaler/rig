@@ -1,68 +1,114 @@
 # Devbox
 
-A CLI tool that creates dockerized development sandboxes for AI agents (Claude, Gemini, Codex, GitHub CLI).
+**Instant, reproducible development environments for AI-assisted coding.**
 
-## Features
+Devbox creates isolated Docker containers pre-configured with your language runtimes, build tools, and AI coding assistants. One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
 
-- Persistent Docker containers with language runtimes and build tools
-- Support for Go, Node, Python, Java, Rust, and Ruby
-- AI agent CLIs pre-installed (Claude, Gemini, Codex, GitHub CLI)
-- Docker-in-Docker support for testcontainers
-- Optional code-server (VS Code in browser) with language extensions
-- Automatic image rebuilding when configuration changes
+## Why Devbox?
 
-## Installation
-
-```bash
-go install github.com/wfaler/devbox@latest
-```
-
-Or build from source:
-
-```bash
-git clone https://github.com/wfaler/devbox.git
-cd devbox
-make build
-```
+- **Zero Setup** — Define your stack in YAML, run `devbox`, and you're coding
+- **AI Agents Ready** — Claude Code, Gemini CLI, and GitHub CLI pre-installed
+- **VS Code in Browser** — Optional code-server with language extensions, auto-configured
+- **Testcontainers Support** — Docker-in-Docker works out of the box
+- **Persistent Sessions** — Your container persists between sessions; instant startup after first build
+- **Auto-Rebuild** — Change your config, and the image rebuilds automatically
 
 ## Quick Start
 
 ```bash
-# Initialize a new workspace
+# Install
+go install github.com/wfaler/devbox@latest
+
+# Initialize a project
+cd your-project
 devbox init
 
-# Edit .assistant.yml to configure your environment
-# Then start an AI agent session
-devbox claude    # or gemini, codex, gh
-
-# Or just open a bash shell
-devbox bash
+# Edit .assistant.yml to your needs, then:
+devbox
 ```
+
+That's it. You're in a container with your languages, tools, and AI assistants ready to go.
 
 ## Configuration
 
-Create a `.assistant.yml` file in your project directory:
+Create `.assistant.yml` in your project root:
 
 ```yaml
 languages:
   node:
     version: "lts"
-    build_system: npm
+    build_system: yarn
   python:
     version: "3.12"
     build_system: poetry
 
 ports:
-  - "8080:8080"
   - "3000"
+  - "5432:5432"
 
 env:
-  API_KEY: "${API_KEY}"
+  API_KEY: "${API_KEY}"  # Expands from host environment
 
-code_server: true  # Optional: VS Code in browser
+code_server:
+  enabled: true
+  theme: "Default Dark Modern"
+  extensions:
+    - github.copilot
 ```
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) for full configuration options.
+### Supported Languages
+
+| Language | Versions | Build Systems |
+|----------|----------|---------------|
+| **Node** | lts, latest, specific (e.g., "20") | npm, yarn, pnpm |
+| **Python** | latest, specific (e.g., "3.12") | pip, poetry, pipenv |
+| **Go** | latest, specific (e.g., "1.22") | built-in |
+| **Java** | latest, specific (e.g., "21") | gradle, maven, sbt, ant |
+| **Rust** | latest, specific (e.g., "1.75") | cargo |
+| **Ruby** | latest, specific (e.g., "3.3") | bundler, gem |
+
+### Code Server (VS Code in Browser)
+
+Enable `code_server` to get a full VS Code experience in your browser:
+
+```yaml
+code_server:
+  enabled: true
+  port: 8080                    # default, auto-exposed
+  theme: "Default Dark Modern"  # any VS Code theme
+  extensions:                   # additional extensions
+    - github.copilot
+    - eamodio.gitlens
+```
+
+Language-specific extensions are auto-installed based on your configured languages.
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `devbox` | Enter the container (builds if needed) |
+| `devbox init` | Create `.assistant.yml` template |
+| `devbox rebuild` | Force clean rebuild of image |
+
+## What's Inside
+
+Every devbox container includes:
+
+- **AI Assistants**: Claude Code, Gemini CLI, GitHub CLI
+- **Dev Tools**: git, curl, wget, jq, vim, build-essential
+- **Docker CLI**: For testcontainers and Docker workflows
+- **Version Managers**: Mise (polyglot) and SDKMAN (JVM)
+
+## How It Works
+
+1. **Config Hash** — Your `.assistant.yml` is hashed to create a unique image tag
+2. **Smart Builds** — Images only rebuild when config changes
+3. **Persistent Containers** — Named `devbox-<project>`, reused across sessions
+4. **Socket Mounting** — Docker socket mounted for testcontainers support
+5. **Entrypoint Magic** — Permissions and services configured at container start
+
+---
 
 ## Development
 
@@ -70,25 +116,23 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for full configuration options.
 
 - Go 1.22+
 - Docker
-- Make (optional)
 
-### Setup
+### Build from Source
 
 ```bash
 git clone https://github.com/wfaler/devbox.git
 cd devbox
-make deps
+make build
 ```
 
 ### Common Tasks
 
 ```bash
-make build      # Build the binary
+make build      # Build binary
 make test       # Run tests
-make test-v     # Run tests with verbose output
-make lint       # Run linter (requires golangci-lint)
+make test-v     # Verbose tests
 make fmt        # Format code
-make clean      # Remove build artifacts
+make clean      # Clean artifacts
 make install    # Install to $GOPATH/bin
 ```
 
@@ -96,47 +140,28 @@ make install    # Install to $GOPATH/bin
 
 ```
 devbox/
-├── main.go                      # Entry point
-├── cmd/                         # CLI commands (Cobra)
-│   ├── root.go                  # Root command
-│   ├── init.go                  # devbox init
-│   ├── agent.go                 # devbox [claude|gemini|codex|gh]
-│   └── bash.go                  # devbox bash
+├── main.go                 # Entry point
+├── cmd/                    # CLI commands (Cobra)
+│   ├── root.go             # Root command (enters container)
+│   ├── init.go             # devbox init
+│   ├── rebuild.go          # devbox rebuild
+│   └── session.go          # Container session logic
 ├── internal/
-│   ├── config/                  # YAML config parsing and validation
-│   ├── docker/                  # Docker SDK client wrapper
-│   ├── dockerfile/              # Dockerfile template generation
-│   └── project/                 # Project utilities (naming, hashing)
-├── REQUIREMENTS.md              # Full specification
+│   ├── config/             # YAML parsing & validation
+│   ├── docker/             # Docker SDK wrapper
+│   ├── dockerfile/         # Dockerfile generation
+│   └── project/            # Project utilities
+├── REQUIREMENTS.md         # Technical specification
 └── Makefile
 ```
 
-### Running Tests
+### Contributing
 
-```bash
-# Run all tests
-make test
+1. Add languages: `internal/config/config.go` + `internal/dockerfile/languages.go`
+2. Add VS Code extensions: `internal/dockerfile/languages.go`
+3. Modify container setup: `internal/dockerfile/template.go`
 
-# Run tests with coverage
-make coverage
-
-# Run specific package tests
-go test ./internal/config/...
-```
-
-### Adding a New Language
-
-1. Add the language to `SupportedLanguages` in `internal/config/config.go`
-2. Add build systems to `BuildSystemsForLanguage` in `internal/config/config.go`
-3. Add install function in `internal/dockerfile/languages.go`
-4. Add VS Code extensions to `VSCodeExtensionsForLanguage` in `internal/dockerfile/languages.go`
-5. Add tests
-
-### Adding a New AI Agent
-
-1. Add the agent name to `validAgents` map in `cmd/agent.go`
-2. Add description to `agentDescriptions` map in `cmd/agent.go`
-3. Add npm package to the Dockerfile template in `internal/dockerfile/template.go`
+See [REQUIREMENTS.md](REQUIREMENTS.md) for the full technical specification.
 
 ## License
 

@@ -83,28 +83,41 @@ languages:
 languages:
   node:
     version: "lts"
-code_server: true
+code_server:
+  enabled: true
+  port: 9000
+  theme: "Monokai"
+  extensions:
+    - github.copilot
 `,
 			want: &Config{
 				Languages: map[string]LanguageConfig{
 					"node": {Version: "lts"},
 				},
-				Ports:      nil,
-				Env:        map[string]string{},
-				CodeServer: true,
+				Ports: nil,
+				Env:   map[string]string{},
+				CodeServer: &CodeServerConfig{
+					Enabled:    true,
+					Port:       9000,
+					Theme:      "Monokai",
+					Extensions: []string{"github.copilot"},
+				},
 			},
 			wantErr: false,
 		},
 		{
 			name: "config with code_server disabled",
 			yaml: `
-code_server: false
+code_server:
+  enabled: false
 `,
 			want: &Config{
-				Languages:  map[string]LanguageConfig{},
-				Ports:      nil,
-				Env:        map[string]string{},
-				CodeServer: false,
+				Languages: map[string]LanguageConfig{},
+				Ports:     nil,
+				Env:       map[string]string{},
+				CodeServer: &CodeServerConfig{
+					Enabled: false,
+				},
 			},
 			wantErr: false,
 		},
