@@ -172,7 +172,7 @@ This is safer than true Docker-in-Docker (which requires `--privileged`), while 
 It is still possible for malicious code to escape, but it is with extra steps: your rig environment would have to spin up _another_ docker image with privileged mode to escape, then proceed to use that to escape. It's possible, but with extra steps.
 At some point, you have to ask yourself, how paranoid are you? Is this better than YOLO'ing Claude or Codex on your host machine without any barriers?
 
-IF you actually are that paranoid, you could also run rig inside a VM quite easily: just create a VM, install docker on it, run rig.
+IF you actually are paranoid (working with unknown/untrusted code), you could also run rig inside a VM quite easily: just create a VM, install docker on it, run rig.
 
 ---
 
