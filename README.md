@@ -2,7 +2,7 @@
 
 **Instant, reproducible development environments for AI-assisted coding.**
 
-Rig creates isolated Docker containers pre-configured with your language runtimes, build tools, and AI coding assistants. One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
+Rig creates isolated Docker containers pre-configured with your language runtimes, build tools, AI coding assistants and optionally code-server (VS Code in the browser). One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
 
 ## Why Rig?
 
