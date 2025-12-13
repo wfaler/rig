@@ -3,7 +3,7 @@ package dockerfile
 import (
 	"fmt"
 
-	"github.com/wfaler/devbox/internal/config"
+	"github.com/wfaler/rig/internal/config"
 )
 
 // GenerateLanguageInstall returns the Dockerfile RUN commands for installing a language

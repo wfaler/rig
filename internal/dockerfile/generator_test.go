@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/wfaler/devbox/internal/config"
+	"github.com/wfaler/rig/internal/config"
 )
 
 func TestGenerate(t *testing.T) {

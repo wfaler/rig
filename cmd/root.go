@@ -8,20 +8,20 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "devbox",
+	Use:   "rig",
 	Short: "Create dockerized development sandboxes for AI agents",
-	Long: `Devbox creates isolated Docker containers configured with language
+	Long: `Rig creates isolated Docker containers configured with language
 runtimes, build tools, and AI agent CLIs (Claude, Gemini, Codex, GitHub CLI).
 
 Containers are persistent between sessions and automatically rebuild
 when configuration changes.
 
 Usage:
-  devbox           Enter the container with bash
-  devbox init      Initialize a new workspace with .assistant.yml
-  devbox rebuild   Force a clean rebuild of the image`,
+  rig           Enter the container (uses configured shell)
+  rig init      Initialize a new workspace with .rig.yml
+  rig rebuild   Force a clean rebuild of the image`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runSession(nil) // Uses configured shell from .assistant.yml
+		return runSession(nil) // Uses configured shell from .rig.yml
 	},
 }
 

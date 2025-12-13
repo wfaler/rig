@@ -5,16 +5,16 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"github.com/wfaler/devbox/internal/project"
+	"github.com/wfaler/rig/internal/project"
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
-	Short: "Initialize a new workspace with an empty .assistant.yml",
-	Long: `Creates an empty .assistant.yml configuration file in the current directory.
+	Short: "Initialize a new workspace with an empty .rig.yml",
+	Long: `Creates an empty .rig.yml configuration file in the current directory.
 
 Example:
-  devbox init
+  rig init
 
 This creates a template configuration file that you can edit to specify:
   - Programming languages and versions (Go, Node, Python, Java, Rust, Ruby)
@@ -24,8 +24,8 @@ This creates a template configuration file that you can edit to specify:
 	RunE: runInit,
 }
 
-const emptyConfig = `# Devbox configuration
-# See: https://github.com/wfaler/devbox for documentation
+const emptyConfig = `# Rig configuration
+# See: https://github.com/wfaler/rig for documentation
 
 languages:
   # Example configurations:
@@ -109,6 +109,6 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Created %s\n", project.ConfigFileName)
 	fmt.Println("Edit this file to configure your development environment, then run:")
-	fmt.Println("  devbox")
+	fmt.Println("  rig")
 	return nil
 }

@@ -42,14 +42,14 @@ func TestGetProjectName(t *testing.T) {
 
 func TestConfigPath(t *testing.T) {
 	dir := "/home/user/myproject"
-	want := "/home/user/myproject/.assistant.yml"
+	want := "/home/user/myproject/.rig.yml"
 	got := ConfigPath(dir)
 	assert.Equal(t, want, got)
 }
 
 func TestConfigExists(t *testing.T) {
 	// Create temp directory
-	tmpDir, err := os.MkdirTemp("", "devbox-test-*")
+	tmpDir, err := os.MkdirTemp("", "rig-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
@@ -95,7 +95,7 @@ func TestComputeHash(t *testing.T) {
 
 func TestComputeConfigHash(t *testing.T) {
 	// Create temp file
-	tmpDir, err := os.MkdirTemp("", "devbox-test-*")
+	tmpDir, err := os.MkdirTemp("", "rig-test-*")
 	require.NoError(t, err)
 	defer os.RemoveAll(tmpDir)
 
@@ -113,7 +113,7 @@ func TestComputeConfigHash(t *testing.T) {
 }
 
 func TestComputeConfigHash_FileNotFound(t *testing.T) {
-	_, err := ComputeConfigHash("/nonexistent/path/.assistant.yml")
+	_, err := ComputeConfigHash("/nonexistent/path/.rig.yml")
 	require.Error(t, err)
 }
 
@@ -128,13 +128,13 @@ func TestImageRef(t *testing.T) {
 			name:        "standard project",
 			projectName: "myproject",
 			configHash:  "abc123def456",
-			want:        "devbox-myproject:abc123def456",
+			want:        "rig-myproject:abc123def456",
 		},
 		{
 			name:        "project with hyphens",
 			projectName: "my-cool-project",
 			configHash:  "xyz789",
-			want:        "devbox-my-cool-project:xyz789",
+			want:        "rig-my-cool-project:xyz789",
 		},
 	}
 
@@ -148,10 +148,10 @@ func TestImageRef(t *testing.T) {
 
 func TestImageName(t *testing.T) {
 	got := ImageName("myproject")
-	assert.Equal(t, "devbox-myproject", got)
+	assert.Equal(t, "rig-myproject", got)
 }
 
 func TestContainerName(t *testing.T) {
 	got := ContainerName("myproject")
-	assert.Equal(t, "devbox-myproject", got)
+	assert.Equal(t, "rig-myproject", got)
 }

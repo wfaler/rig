@@ -10,7 +10,7 @@ import (
 
 const (
 	// ConfigFileName is the name of the configuration file
-	ConfigFileName = ".assistant.yml"
+	ConfigFileName = ".rig.yml"
 
 	// HashLength is the number of characters to use from the SHA256 hash for image tags
 	HashLength = 12
@@ -51,17 +51,17 @@ func ComputeHash(data []byte) string {
 
 // ImageRef returns the full image reference (name:tag) for a project
 func ImageRef(projectName, configHash string) string {
-	return fmt.Sprintf("devbox-%s:%s", projectName, configHash)
+	return fmt.Sprintf("rig-%s:%s", projectName, configHash)
 }
 
 // ImageName returns just the image name without tag
 func ImageName(projectName string) string {
-	return fmt.Sprintf("devbox-%s", projectName)
+	return fmt.Sprintf("rig-%s", projectName)
 }
 
 // ContainerName returns the container name for a project
 func ContainerName(projectName string) string {
-	return fmt.Sprintf("devbox-%s", projectName)
+	return fmt.Sprintf("rig-%s", projectName)
 }
 
 // GetCurrentDirectory returns the current working directory

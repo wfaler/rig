@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/wfaler/devbox/internal/config"
+	"github.com/wfaler/rig/internal/config"
 )
 
 func TestGenerateLanguageInstall(t *testing.T) {

@@ -1,6 +1,6 @@
-# Devbox Technical Specification
+# Rig Technical Specification
 
-This document serves as the technical reference for devbox internals and configuration options.
+This document serves as the technical reference for rig internals and configuration options.
 
 ## Architecture
 
@@ -26,9 +26,9 @@ Java defaults to Temurin (Eclipse Adoptium) distribution.
 
 | Command | Description |
 |---------|-------------|
-| `devbox` | Enter container with bash (creates/starts if needed) |
-| `devbox init` | Create `.assistant.yml` template in current directory |
-| `devbox rebuild` | Force clean rebuild (removes container + image) |
+| `rig` | Enter container (creates/starts if needed) |
+| `rig init` | Create `.rig.yml` template in current directory |
+| `rig rebuild` | Force clean rebuild (removes container + image) |
 
 ---
 
@@ -37,17 +37,17 @@ Java defaults to Temurin (Eclipse Adoptium) distribution.
 ### Lifecycle
 
 - **Persistent**: Containers are reused across sessions (not ephemeral)
-- **Auto-rebuild**: Image rebuilds when `.assistant.yml` content changes
-- **Named**: Container named `devbox-<project-directory>`
+- **Auto-rebuild**: Image rebuilds when `.rig.yml` content changes
+- **Named**: Container named `rig-<project-directory>`
 
 ### Image Tagging
 
 ```
-devbox-<project>:<hash>
+rig-<project>:<hash>
 ```
 
 - `<project>`: Current directory name
-- `<hash>`: First 12 characters of SHA256 hash of `.assistant.yml`
+- `<hash>`: First 12 characters of SHA256 hash of `.rig.yml`
 
 ### Mounts
 
@@ -73,7 +73,7 @@ The container entrypoint:
 
 ## Configuration Reference
 
-### `.assistant.yml` Schema
+### `.rig.yml` Schema
 
 ```yaml
 # Language runtimes
@@ -216,12 +216,12 @@ code_server:
 ## Project Structure
 
 ```
-devbox/
+rig/
 ├── main.go                      # Entry point
 ├── cmd/
 │   ├── root.go                  # Root command, enters container
-│   ├── init.go                  # devbox init
-│   ├── rebuild.go               # devbox rebuild
+│   ├── init.go                  # rig init
+│   ├── rebuild.go               # rig rebuild
 │   └── session.go               # Container session orchestration
 ├── internal/
 │   ├── config/

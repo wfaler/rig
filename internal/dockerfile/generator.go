@@ -6,7 +6,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/wfaler/devbox/internal/config"
+	"github.com/wfaler/rig/internal/config"
 )
 
 // TemplateData holds the data passed to the Dockerfile template

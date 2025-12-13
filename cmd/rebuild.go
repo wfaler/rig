@@ -7,15 +7,15 @@ import (
 	"path/filepath"
 
 	"github.com/spf13/cobra"
-	"github.com/wfaler/devbox/internal/config"
-	"github.com/wfaler/devbox/internal/docker"
-	"github.com/wfaler/devbox/internal/dockerfile"
-	"github.com/wfaler/devbox/internal/project"
+	"github.com/wfaler/rig/internal/config"
+	"github.com/wfaler/rig/internal/docker"
+	"github.com/wfaler/rig/internal/dockerfile"
+	"github.com/wfaler/rig/internal/project"
 )
 
 var rebuildCmd = &cobra.Command{
 	Use:   "rebuild",
-	Short: "Force a clean rebuild of the devbox image",
+	Short: "Force a clean rebuild of the rig image",
 	Long: `Removes the existing container and image, then rebuilds from scratch.
 
 Use this when:
@@ -101,6 +101,6 @@ func runRebuild(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("building image: %w", err)
 	}
 
-	fmt.Println("Rebuild complete! Run 'devbox' to enter the container.")
+	fmt.Println("Rebuild complete! Run 'rig' to enter the container.")
 	return nil
 }

@@ -6,13 +6,13 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/wfaler/devbox/internal/config"
-	"github.com/wfaler/devbox/internal/docker"
-	"github.com/wfaler/devbox/internal/dockerfile"
-	"github.com/wfaler/devbox/internal/project"
+	"github.com/wfaler/rig/internal/config"
+	"github.com/wfaler/rig/internal/docker"
+	"github.com/wfaler/rig/internal/dockerfile"
+	"github.com/wfaler/rig/internal/project"
 )
 
-const configFileName = ".assistant.yml"
+const configFileName = ".rig.yml"
 
 // runSession handles the complete flow of loading config, building image,
 // creating container, and attaching to run a command

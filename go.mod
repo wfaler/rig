@@ -1,4 +1,4 @@
-module github.com/wfaler/devbox
+module github.com/wfaler/rig
 
 go 1.25.5
 

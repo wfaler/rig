@@ -1,12 +1,12 @@
-# Devbox
+# Rig
 
 **Instant, reproducible development environments for AI-assisted coding.**
 
-Devbox creates isolated Docker containers pre-configured with your language runtimes, build tools, and AI coding assistants. One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
+Rig creates isolated Docker containers pre-configured with your language runtimes, build tools, and AI coding assistants. One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
 
-## Why Devbox?
+## Why Rig?
 
-- **Zero Setup** — Define your stack in YAML, run `devbox`, and you're coding
+- **Zero Setup** — Define your stack in YAML, run `rig`, and you're coding
 - **AI Agents Ready** — Claude Code, Gemini CLI, OpenAI Codex and GitHub CLI pre-installed
 - **VS Code in Browser** — Optional code-server with language extensions, auto-configured
 - **Testcontainers Support** — Docker-in-Docker works out of the box
@@ -17,21 +17,21 @@ Devbox creates isolated Docker containers pre-configured with your language runt
 
 ```bash
 # Install
-go install github.com/wfaler/devbox@latest
+go install github.com/wfaler/rig@latest
 
 # Initialize a project
 cd your-project
-devbox init
+rig init
 
-# Edit .assistant.yml to your needs, then:
-devbox
+# Edit .rig.yml to your needs, then:
+rig
 ```
 
 That's it. You're in a container with your languages, tools, and AI assistants ready to go.
 
 ## Configuration
 
-Create `.assistant.yml` in your project root:
+Create `.rig.yml` in your project root:
 
 ```yaml
 languages:
@@ -84,19 +84,19 @@ code_server:
     - github.copilot            # AI assistant
 ```
 
-Run `devbox init` to see all recommended extensions for each language.
+Run `rig init` to see all recommended extensions for each language.
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `devbox` | Enter the container (builds if needed) |
-| `devbox init` | Create `.assistant.yml` template |
-| `devbox rebuild` | Force clean rebuild of image |
+| `rig` | Enter the container (builds if needed) |
+| `rig init` | Create `.rig.yml` template |
+| `rig rebuild` | Force clean rebuild of image |
 
 ## What's Inside
 
-Every devbox container includes:
+Every rig container includes:
 
 - **AI Assistants**: Claude Code, Gemini CLI, GitHub CLI
 - **Dev Tools**: git, curl, wget, jq, vim, build-essential
@@ -105,9 +105,9 @@ Every devbox container includes:
 
 ## How It Works
 
-1. **Config Hash** — Your `.assistant.yml` is hashed to create a unique image tag
+1. **Config Hash** — Your `.rig.yml` is hashed to create a unique image tag
 2. **Smart Builds** — Images only rebuild when config changes
-3. **Persistent Containers** — Named `devbox-<project>`, reused across sessions
+3. **Persistent Containers** — Named `rig-<project>`, reused across sessions
 4. **Socket Mounting** — Docker socket mounted for testcontainers support
 5. **Entrypoint Magic** — Permissions and services configured at container start
 
@@ -125,8 +125,8 @@ Go is only required to build.
 ### Build from Source
 
 ```bash
-git clone https://github.com/wfaler/devbox.git
-cd devbox
+git clone https://github.com/wfaler/rig.git
+cd rig
 make build
 ```
 
@@ -144,12 +144,12 @@ make install    # Install to $GOPATH/bin
 ### Project Structure
 
 ```
-devbox/
+rig/
 ├── main.go                 # Entry point
 ├── cmd/                    # CLI commands (Cobra)
 │   ├── root.go             # Root command (enters container)
-│   ├── init.go             # devbox init
-│   ├── rebuild.go          # devbox rebuild
+│   ├── init.go             # rig init
+│   ├── rebuild.go          # rig rebuild
 │   └── session.go          # Container session logic
 ├── internal/
 │   ├── config/             # YAML parsing & validation

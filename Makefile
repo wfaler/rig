@@ -1,7 +1,7 @@
 .PHONY: build test test-v clean install deps fmt lint coverage help
 
 # Binary name
-BINARY := devbox
+BINARY := rig
 
 # Go parameters
 GOCMD := go
