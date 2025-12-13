@@ -163,11 +163,14 @@ Every rig container includes:
 
 Rig does **not** run containers in privileged mode. Instead, it mounts the host's Docker socket (`/var/run/docker.sock`) into the container. This approach:
 
-- **Avoids privileged mode** — No elevated kernel capabilities or root access to the host
+- **Avoids privileged mode** — No elevated kernel capabilities or direct root access to the host
 - **Uses the host's Docker daemon** — Containers you create are siblings, not nested children
 - **Works with Testcontainers** — Pre-configured environment variables ensure compatibility
 
 This is safer than true Docker-in-Docker (which requires `--privileged`), while still enabling full Docker workflows inside your development environment.
+
+It is still possible for malicious code to escape, but it is with extra steps: your rig environment would have to spin up _another_ docker image with privileged mode to escape, then proceed to use that to escape. It's possible, but with extra steps.
+At some point, you have to ask yourself, how paranoid are you? Is this better than YOLO'ing Claude or Codex on your host machine without any barriers?
 
 ---
 
