@@ -303,3 +303,99 @@ func TestHasLanguage(t *testing.T) {
 	assert.True(t, cfg.HasLanguage("node"))
 	assert.False(t, cfg.HasLanguage("python"))
 }
+
+func TestGetShell(t *testing.T) {
+	tests := []struct {
+		name   string
+		config Config
+		want   string
+	}{
+		{
+			name:   "empty defaults to bash",
+			config: Config{},
+			want:   "bash",
+		},
+		{
+			name:   "bash explicitly set",
+			config: Config{Shell: "bash"},
+			want:   "bash",
+		},
+		{
+			name:   "zsh",
+			config: Config{Shell: "zsh"},
+			want:   "zsh",
+		},
+		{
+			name:   "fish",
+			config: Config{Shell: "fish"},
+			want:   "fish",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.config.GetShell())
+		})
+	}
+}
+
+func TestShellValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name:    "valid bash",
+			config:  Config{Shell: "bash"},
+			wantErr: false,
+		},
+		{
+			name:    "valid zsh",
+			config:  Config{Shell: "zsh"},
+			wantErr: false,
+		},
+		{
+			name:    "valid fish",
+			config:  Config{Shell: "fish"},
+			wantErr: false,
+		},
+		{
+			name:    "empty shell is valid (defaults to bash)",
+			config:  Config{},
+			wantErr: false,
+		},
+		{
+			name:    "invalid shell",
+			config:  Config{Shell: "csh"},
+			wantErr: true,
+			errMsg:  "unsupported shell",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestParseWithShell(t *testing.T) {
+	yaml := `
+shell: zsh
+languages:
+  node:
+    version: "lts"
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	assert.Equal(t, "zsh", cfg.Shell)
+	assert.Equal(t, "zsh", cfg.GetShell())
+}

@@ -20,6 +20,7 @@ type TemplateData struct {
 	CodeServerPort       int
 	CodeServerTheme      string
 	CodeServerExtensions []string
+	Shell                string
 }
 
 // Generate creates a Dockerfile string from the config
@@ -44,13 +45,10 @@ func Generate(cfg *config.Config) (string, error) {
 		}
 	}
 
-	// Get VS Code extensions for configured languages if code-server is enabled
+	// Get VS Code extensions from config (user specifies all extensions explicitly)
 	var extensions []string
 	if cfg.IsCodeServerEnabled() {
-		// Add language-specific extensions
-		extensions = GetExtensionsForLanguages(languages)
-		// Add custom extensions from config
-		extensions = append(extensions, cfg.GetCodeServerExtensions()...)
+		extensions = cfg.GetCodeServerExtensions()
 	}
 
 	data := TemplateData{
@@ -63,6 +61,7 @@ func Generate(cfg *config.Config) (string, error) {
 		CodeServerPort:       cfg.GetCodeServerPort(),
 		CodeServerTheme:      cfg.GetCodeServerTheme(),
 		CodeServerExtensions: extensions,
+		Shell:                cfg.GetShell(),
 	}
 
 	tmpl, err := template.New("dockerfile").Parse(BaseTemplate)

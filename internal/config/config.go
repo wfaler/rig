@@ -15,6 +15,22 @@ type Config struct {
 	Ports      []string                  `yaml:"ports"`
 	Env        map[string]string         `yaml:"env"`
 	CodeServer *CodeServerConfig         `yaml:"code_server"`
+	Shell      string                    `yaml:"shell"` // bash (default), zsh, fish
+}
+
+// SupportedShells lists valid shell options
+var SupportedShells = map[string]bool{
+	"bash": true,
+	"zsh":  true,
+	"fish": true,
+}
+
+// GetShell returns the configured shell, defaulting to bash
+func (c *Config) GetShell() string {
+	if c.Shell == "" {
+		return "bash"
+	}
+	return c.Shell
 }
 
 // CodeServerConfig defines code-server (VS Code in browser) settings
@@ -161,6 +177,11 @@ func (c *Config) Validate() error {
 		if err := validatePortSpec(port); err != nil {
 			return fmt.Errorf("invalid port %q: %w", port, err)
 		}
+	}
+
+	// Validate shell
+	if c.Shell != "" && !SupportedShells[c.Shell] {
+		return fmt.Errorf("unsupported shell: %s (supported: bash, zsh, fish)", c.Shell)
 	}
 
 	return nil

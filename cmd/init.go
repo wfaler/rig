@@ -57,14 +57,38 @@ env: {}
   # API_KEY: "${API_KEY}"
   # DATABASE_URL: "postgres://localhost:5432/dev"
 
+# Default shell: bash, zsh (with oh-my-zsh), or fish
+# shell: bash
+
 # VS Code in browser (code-server)
 # code_server:
 #   enabled: true
 #   port: 8080                           # default: 8080
 #   theme: "Default Dark Modern"         # VS Code theme
-#   extensions:                          # additional extensions to install
+#   extensions:                          # extensions to install
+#     # General
 #     - github.copilot
 #     - eamodio.gitlens
+#     # Go
+#     - golang.go
+#     # Node/TypeScript
+#     - dbaeumer.vscode-eslint
+#     - esbenp.prettier-vscode
+#     - ms-vscode.vscode-typescript-next
+#     # Python
+#     - ms-python.python
+#     - ms-python.vscode-pylance
+#     - ms-python.debugpy
+#     # Java
+#     - redhat.java
+#     - vscjava.vscode-java-debug
+#     - vscjava.vscode-java-dependency
+#     - vscjava.vscode-maven
+#     - vscjava.vscode-gradle
+#     # Rust
+#     - rust-lang.rust-analyzer
+#     # Ruby
+#     - shopify.ruby-lsp
 `
 
 func runInit(cmd *cobra.Command, args []string) error {

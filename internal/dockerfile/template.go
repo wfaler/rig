@@ -36,7 +36,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libreadline-dev \
     libsqlite3-dev \
     libffi-dev \
-    && rm -rf /var/lib/apt/lists/*
+{{ if eq .Shell "zsh" }}    zsh \
+{{ else if eq .Shell "fish" }}    fish \
+{{ end }}    && rm -rf /var/lib/apt/lists/*
 
 # Docker CLI for DinD support (testcontainers)
 RUN curl -fsSL https://download.docker.com/linux/debian/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg \
@@ -58,11 +60,18 @@ RUN curl -fsSL https://code-server.dev/install.sh | sh
 {{ end }}
 
 # Create non-root user for development
-RUN useradd -m -s /bin/bash developer \
+RUN useradd -m -s /bin/{{ .Shell }} developer \
     && echo "developer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # Add developer to docker group for socket access
 RUN groupadd -f docker && usermod -aG docker developer
+
+{{ if eq .Shell "zsh" }}
+# Install Oh My Zsh for developer user
+USER developer
+RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+USER root
+{{ end }}
 
 # Create entrypoint script to fix Docker socket permissions and start services
 RUN printf '%s\n' '#!/bin/bash' \
@@ -97,7 +106,10 @@ RUN curl -s "https://get.sdkman.io?rcupdate=false" | bash
 {{ end }}
 
 # Configure shell to load Mise and SDKMAN
-RUN echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc {{ if .HasJava }}&& echo 'source ~/.sdkman/bin/sdkman-init.sh' >> ~/.bashrc{{ end }}
+{{ if eq .Shell "bash" }}RUN echo 'eval "$(~/.local/bin/mise activate bash)"' >> ~/.bashrc {{ if .HasJava }}&& echo 'source ~/.sdkman/bin/sdkman-init.sh' >> ~/.bashrc{{ end }}
+{{ else if eq .Shell "zsh" }}RUN echo 'eval "$(~/.local/bin/mise activate zsh)"' >> ~/.zshrc {{ if .HasJava }}&& echo 'source ~/.sdkman/bin/sdkman-init.sh' >> ~/.zshrc{{ end }}
+{{ else if eq .Shell "fish" }}RUN mkdir -p ~/.config/fish && echo 'mise activate fish | source' >> ~/.config/fish/config.fish {{ if .HasJava }}&& echo 'source ~/.sdkman/bin/sdkman-init.sh' >> ~/.config/fish/config.fish{{ end }}
+{{ end }}
 
 {{ .LanguageInstalls }}
 
@@ -137,5 +149,5 @@ WORKDIR /workspace
 ENV {{ $key }}="{{ $value }}"
 {{ end }}
 
-CMD ["/bin/bash"]
+CMD ["/bin/{{ .Shell }}"]
 `

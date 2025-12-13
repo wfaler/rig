@@ -174,7 +174,7 @@ func TestGenerateWithCodeServer(t *testing.T) {
 			},
 		},
 		{
-			name: "code-server enabled with go",
+			name: "code-server enabled without extensions",
 			config: &config.Config{
 				Languages:  map[string]config.LanguageConfig{"go": {Version: "1.22"}},
 				Env:        map[string]string{},
@@ -182,31 +182,17 @@ func TestGenerateWithCodeServer(t *testing.T) {
 			},
 			wantContains: []string{
 				"code-server.dev/install.sh",
-				"--install-extension golang.go",
+			},
+			wantNotContain: []string{
+				"--install-extension", // No auto-install of language extensions
 			},
 		},
 		{
-			name: "code-server enabled with multiple languages",
-			config: &config.Config{
-				Languages: map[string]config.LanguageConfig{
-					"node":   {Version: "lts"},
-					"python": {Version: "3.12"},
-				},
-				Env:        map[string]string{},
-				CodeServer: &config.CodeServerConfig{Enabled: true},
-			},
-			wantContains: []string{
-				"code-server.dev/install.sh",
-				"--install-extension ms-python.python",
-				"--install-extension dbaeumer.vscode-eslint",
-			},
-		},
-		{
-			name: "code-server enabled with custom extensions",
+			name: "code-server enabled with explicit extensions",
 			config: &config.Config{
 				Languages:  map[string]config.LanguageConfig{"go": {Version: "1.22"}},
 				Env:        map[string]string{},
-				CodeServer: &config.CodeServerConfig{Enabled: true, Extensions: []string{"github.copilot"}},
+				CodeServer: &config.CodeServerConfig{Enabled: true, Extensions: []string{"golang.go", "github.copilot"}},
 			},
 			wantContains: []string{
 				"code-server.dev/install.sh",
@@ -262,4 +248,95 @@ func TestGenerateWithJavaIncludesSDKMAN(t *testing.T) {
 	// Should install Java and Maven via SDKMAN
 	assert.Contains(t, dockerfile, "sdk install java")
 	assert.Contains(t, dockerfile, "sdk install maven")
+}
+
+func TestGenerateWithShellConfiguration(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         *config.Config
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "default bash shell",
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{},
+				Env:       map[string]string{},
+			},
+			wantContains: []string{
+				"useradd -m -s /bin/bash developer",
+				`CMD ["/bin/bash"]`,
+				`mise activate bash`,
+			},
+			wantNotContain: []string{
+				"oh-my-zsh",
+				"fish",
+			},
+		},
+		{
+			name: "zsh with oh-my-zsh",
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{},
+				Env:       map[string]string{},
+				Shell:     "zsh",
+			},
+			wantContains: []string{
+				"useradd -m -s /bin/zsh developer",
+				`CMD ["/bin/zsh"]`,
+				"ohmyzsh",
+				"zsh",
+				`mise activate zsh`,
+				">> ~/.zshrc",
+			},
+		},
+		{
+			name: "fish shell",
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{},
+				Env:       map[string]string{},
+				Shell:     "fish",
+			},
+			wantContains: []string{
+				"useradd -m -s /bin/fish developer",
+				`CMD ["/bin/fish"]`,
+				"fish",
+				"mise activate fish | source",
+				"~/.config/fish/config.fish",
+			},
+			wantNotContain: []string{
+				"oh-my-zsh",
+			},
+		},
+		{
+			name: "zsh with java and sdkman",
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{
+					"java": {Version: "21"},
+				},
+				Env:   map[string]string{},
+				Shell: "zsh",
+			},
+			wantContains: []string{
+				"useradd -m -s /bin/zsh developer",
+				`mise activate zsh`,
+				"sdkman-init.sh",
+				">> ~/.zshrc",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dockerfile, err := Generate(tt.config)
+			require.NoError(t, err)
+
+			for _, want := range tt.wantContains {
+				assert.Contains(t, dockerfile, want, "expected Dockerfile to contain: %s", want)
+			}
+
+			for _, notWant := range tt.wantNotContain {
+				assert.NotContains(t, dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
+			}
+		})
+	}
 }

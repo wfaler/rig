@@ -40,6 +40,11 @@ func runSession(command []string) error {
 	// Expand environment variables
 	cfg.ExpandEnvVars()
 
+	// Use configured shell if no command specified
+	if len(command) == 0 {
+		command = []string{"/bin/" + cfg.GetShell()}
+	}
+
 	// Generate project name and image reference
 	projectName := project.GetProjectName(cwd)
 	configHash, err := project.ComputeConfigHash(configPath)

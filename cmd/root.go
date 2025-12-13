@@ -21,7 +21,7 @@ Usage:
   devbox init      Initialize a new workspace with .assistant.yml
   devbox rebuild   Force a clean rebuild of the image`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return runSession([]string{"/bin/bash"})
+		return runSession(nil) // Uses configured shell from .assistant.yml
 	},
 }
 

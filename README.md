@@ -7,7 +7,7 @@ Devbox creates isolated Docker containers pre-configured with your language runt
 ## Why Devbox?
 
 - **Zero Setup** — Define your stack in YAML, run `devbox`, and you're coding
-- **AI Agents Ready** — Claude Code, Gemini CLI, and GitHub CLI pre-installed
+- **AI Agents Ready** — Claude Code, Gemini CLI, OpenAI Codex and GitHub CLI pre-installed
 - **VS Code in Browser** — Optional code-server with language extensions, auto-configured
 - **Testcontainers Support** — Docker-in-Docker works out of the box
 - **Persistent Sessions** — Your container persists between sessions; instant startup after first build
@@ -49,6 +49,8 @@ ports:
 env:
   API_KEY: "${API_KEY}"  # Expands from host environment
 
+shell: zsh  # bash (default), zsh (with oh-my-zsh), or fish
+
 code_server:
   enabled: true
   theme: "Default Dark Modern"
@@ -63,7 +65,7 @@ code_server:
 | **Node** | lts, latest, specific (e.g., "20") | npm, yarn, pnpm |
 | **Python** | latest, specific (e.g., "3.12") | pip, poetry, pipenv |
 | **Go** | latest, specific (e.g., "1.22") | built-in |
-| **Java** | latest, specific (e.g., "21") | gradle, maven, sbt, ant |
+| **Java/Kotlin/Scala** | latest, specific (e.g., "21") | gradle, maven, sbt, ant |
 | **Rust** | latest, specific (e.g., "1.75") | cargo |
 | **Ruby** | latest, specific (e.g., "3.3") | bundler, gem |
 
@@ -76,12 +78,13 @@ code_server:
   enabled: true
   port: 8080                    # default, auto-exposed
   theme: "Default Dark Modern"  # any VS Code theme
-  extensions:                   # additional extensions
-    - github.copilot
-    - eamodio.gitlens
+  extensions:                   # extensions to install
+    - golang.go                 # Go
+    - ms-python.python          # Python
+    - github.copilot            # AI assistant
 ```
 
-Language-specific extensions are auto-installed based on your configured languages.
+Run `devbox init` to see all recommended extensions for each language.
 
 ## Commands
 
@@ -116,6 +119,8 @@ Every devbox container includes:
 
 - Go 1.22+
 - Docker
+
+Go is only required to build.
 
 ### Build from Source
 

@@ -93,6 +93,9 @@ env:
   KEY: "value"
   SECRET: "${HOST_SECRET}"
 
+# Default shell
+shell: bash                      # bash (default), zsh (with oh-my-zsh), fish
+
 # VS Code in browser
 code_server:
   enabled: true|false
@@ -101,6 +104,14 @@ code_server:
   extensions:                   # additional extensions
     - extension.id
 ```
+
+### Supported Shells
+
+| Shell | Value | Notes |
+|-------|-------|-------|
+| Bash | `bash` | Default shell |
+| Zsh | `zsh` | Includes Oh My Zsh |
+| Fish | `fish` | Fish shell |
 
 ### Supported Languages
 
@@ -113,9 +124,9 @@ code_server:
 | Rust | `rust` | `latest`, `1.75`, `1.75.0` | `cargo` |
 | Ruby | `ruby` | `latest`, `3.3`, `3.3.0` | `bundler`, `gem` |
 
-### Code Server Extensions
+### Recommended Code Server Extensions
 
-Auto-installed based on configured languages:
+Extensions are configured explicitly in the `extensions` list. Recommended extensions by language:
 
 | Language | Extensions |
 |----------|------------|
@@ -125,6 +136,7 @@ Auto-installed based on configured languages:
 | Java | `redhat.java`, `vscjava.vscode-java-debug`, `vscjava.vscode-java-dependency`, `vscjava.vscode-maven`, `vscjava.vscode-gradle` |
 | Rust | `rust-lang.rust-analyzer` |
 | Ruby | `shopify.ruby-lsp` |
+| General | `github.copilot`, `eamodio.gitlens` |
 
 ---
 
@@ -174,6 +186,8 @@ ports:
 env:
   OPENAI_API_KEY: "${OPENAI_API_KEY}"
   DATABASE_URL: "postgres://localhost:5432/dev"
+
+shell: zsh
 
 code_server:
   enabled: true
