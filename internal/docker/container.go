@@ -99,6 +99,22 @@ func (c *Client) StopContainer(ctx context.Context, containerID string) error {
 	return nil
 }
 
+// WaitContainer waits for a container to reach a non-running state
+func (c *Client) WaitContainer(ctx context.Context, containerID string) error {
+	statusCh, errCh := c.cli.ContainerWait(ctx, containerID, container.WaitConditionNotRunning)
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return fmt.Errorf("waiting for container: %w", err)
+		}
+	case <-statusCh:
+		// Container stopped
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	return nil
+}
+
 // RemoveContainer removes a container
 func (c *Client) RemoveContainer(ctx context.Context, containerID string, force bool) error {
 	if err := c.cli.ContainerRemove(ctx, containerID, container.RemoveOptions{Force: force}); err != nil {

@@ -29,6 +29,9 @@ type DockerClient interface {
 	// StopContainer stops a running container
 	StopContainer(ctx context.Context, containerID string) error
 
+	// WaitContainer waits for a container to stop
+	WaitContainer(ctx context.Context, containerID string) error
+
 	// RemoveContainer removes a container
 	RemoveContainer(ctx context.Context, containerID string, force bool) error
 

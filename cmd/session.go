@@ -88,73 +88,61 @@ func runSession(command []string) error {
 		return fmt.Errorf("finding container: %w", err)
 	}
 
-	// Check if container exists
 	if containerID != "" {
-		// Check if already running - if so, just attach
+		// Container exists - check its state and image
 		running, err := dockerClient.IsContainerRunning(ctx, containerID)
 		if err != nil {
 			return fmt.Errorf("checking container status: %w", err)
 		}
 
-		if running {
-			// Container already running with same config - just attach
-			currentImage, err := dockerClient.GetContainerImage(ctx, containerID)
-			if err != nil {
-				return fmt.Errorf("getting container image: %w", err)
-			}
+		currentImage, err := dockerClient.GetContainerImage(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("getting container image: %w", err)
+		}
 
-			if currentImage == imageRef {
-				// Same image, already running - attach directly
+		if currentImage == imageRef {
+			// Same image - reuse container
+			if running {
+				// Already running - just exec into it
+				fmt.Printf("Attaching to running container %s...\n", containerName)
 				if err := dockerClient.Attach(ctx, containerID, command); err != nil {
 					return fmt.Errorf("attaching to container: %w", err)
 				}
 				return nil
 			}
+			// Same image but stopped - start it
+			fmt.Printf("Starting container %s...\n", containerName)
+			if err := dockerClient.StartContainer(ctx, containerID); err != nil {
+				return fmt.Errorf("starting container: %w", err)
+			}
+			if err := dockerClient.Attach(ctx, containerID, command); err != nil {
+				return fmt.Errorf("attaching to container: %w", err)
+			}
+			return nil
+		}
 
-			// Different image - need to stop, remove, and recreate
-			fmt.Printf("Config changed, recreating container...\n")
-			if err := dockerClient.StopContainer(ctx, containerID); err != nil {
-				return fmt.Errorf("stopping old container: %w", err)
-			}
-			if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
-				return fmt.Errorf("removing old container: %w", err)
-			}
-			containerID = ""
-		} else {
-			// Container exists but not running - check image
-			currentImage, err := dockerClient.GetContainerImage(ctx, containerID)
-			if err != nil {
-				return fmt.Errorf("getting container image: %w", err)
-			}
-
-			if currentImage != imageRef {
-				// Different image - remove and recreate
-				fmt.Printf("Config changed, recreating container...\n")
-				if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
-					return fmt.Errorf("removing old container: %w", err)
-				}
-				containerID = ""
-			}
+		// Different image - need to remove and recreate
+		fmt.Printf("Config changed, recreating container...\n")
+		if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
+			return fmt.Errorf("removing old container: %w", err)
 		}
 	}
 
-	if containerID == "" {
-		// Create new container
-		fmt.Printf("Creating container %s...\n", containerName)
-		containerID, err = dockerClient.CreateContainer(ctx, docker.ContainerConfig{
-			ImageRef:      imageRef,
-			ContainerName: containerName,
-			WorkDir:       cwd,
-			Ports:         cfg.GetAllPorts(),
-			Env:           cfg.Env,
-			Command:       command,
-		})
-		if err != nil {
-			return fmt.Errorf("creating container: %w", err)
-		}
+	// Create new container
+	fmt.Printf("Creating container %s...\n", containerName)
+	containerID, err = dockerClient.CreateContainer(ctx, docker.ContainerConfig{
+		ImageRef:      imageRef,
+		ContainerName: containerName,
+		WorkDir:       cwd,
+		Ports:         cfg.GetAllPorts(),
+		Env:           cfg.Env,
+		Command:       command,
+	})
+	if err != nil {
+		return fmt.Errorf("creating container: %w", err)
 	}
 
-	// Start container (only reached if container was just created or was stopped)
+	// Start container
 	fmt.Printf("Starting container...\n")
 	if err := dockerClient.StartContainer(ctx, containerID); err != nil {
 		return fmt.Errorf("starting container: %w", err)

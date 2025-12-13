@@ -77,6 +77,18 @@ func runRebuild(cmd *cobra.Command, args []string) error {
 	}
 	if containerID != "" {
 		fmt.Printf("Removing container %s...\n", containerName)
+		// Check if running and stop first
+		running, err := dockerClient.IsContainerRunning(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("checking container status: %w", err)
+		}
+		if running {
+			if err := dockerClient.StopContainer(ctx, containerID); err != nil {
+				return fmt.Errorf("stopping container: %w", err)
+			}
+			// Wait for container to fully stop before removing
+			_ = dockerClient.WaitContainer(ctx, containerID) // Ignore errors
+		}
 		if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
 			return fmt.Errorf("removing container: %w", err)
 		}
