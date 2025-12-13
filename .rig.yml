@@ -1,0 +1,65 @@
+# Rig configuration
+# See: https://github.com/wfaler/rig for documentation
+
+languages:
+  # Example configurations:
+  # node:
+  #   version: "lts"           # "lts", "latest", or specific version like "20"
+  #   build_system: npm        # npm, yarn, or pnpm
+  # python:
+  #   version: "3.12"
+  #   build_system: poetry
+  #   build_system_version: "1.7.0"
+  # java:
+  #   version: "21"
+  #   build_system: gradle
+  go:
+    version: "1.25"
+  # rust:
+  #   version: "latest"
+  # ruby:
+  #   version: "3.3"
+  #   build_system: bundler
+
+ports: []
+  # Port mappings in "host:container" or "port" format:
+  # - "8080:8080"
+  # - "3000"
+
+env: {}
+  # Environment variables (supports ${VAR} expansion from host):
+  # API_KEY: "${API_KEY}"
+  # DATABASE_URL: "postgres://localhost:5432/dev"
+
+# Default shell: zsh (default, with oh-my-zsh), bash, or fish
+# shell: zsh
+
+# VS Code in browser (code-server)
+# code_server:
+#   enabled: true
+#   port: 8080                           # default: 8080
+#   theme: "Default Dark Modern"         # VS Code theme
+#   extensions:                          # extensions to install
+#     # General
+#     - github.copilot
+#     - eamodio.gitlens
+#     # Go
+#     - golang.go
+#     # Node/TypeScript
+#     - dbaeumer.vscode-eslint
+#     - esbenp.prettier-vscode
+#     - ms-vscode.vscode-typescript-next
+#     # Python
+#     - ms-python.python
+#     - ms-python.vscode-pylance
+#     - ms-python.debugpy
+#     # Java
+#     - redhat.java
+#     - vscjava.vscode-java-debug
+#     - vscjava.vscode-java-dependency
+#     - vscjava.vscode-maven
+#     - vscjava.vscode-gradle
+#     # Rust
+#     - rust-lang.rust-analyzer
+#     # Ruby
+#     - shopify.ruby-lsp
