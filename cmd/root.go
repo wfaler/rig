@@ -19,6 +19,7 @@ when configuration changes.
 Usage:
   rig           Enter the container (uses configured shell)
   rig init      Initialize a new workspace with .rig.yml
+  rig down      Stop the container (preserves state)
   rig rebuild   Force a clean rebuild of the image`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return runSession(nil) // Uses configured shell from .rig.yml

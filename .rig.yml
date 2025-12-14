@@ -35,16 +35,16 @@ env: {}
 # shell: zsh
 
 # VS Code in browser (code-server)
-# code_server:
-#   enabled: true
-#   port: 8080                           # default: 8080
-#   theme: "Default Dark Modern"         # VS Code theme
-#   extensions:                          # extensions to install
+code_server:
+  enabled: true
+  port: 8080                           # default: 8080
+  theme: "Default Dark Modern"         # VS Code theme
+  extensions:                          # extensions to install
 #     # General
 #     - github.copilot
 #     - eamodio.gitlens
 #     # Go
-#     - golang.go
+    - golang.go
 #     # Node/TypeScript
 #     - dbaeumer.vscode-eslint
 #     - esbenp.prettier-vscode

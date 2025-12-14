@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go version:*)",
+      "WebSearch",
+      "Bash(go mod init:*)",
+      "Bash(go get:*)",
+      "Bash(go build:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go test:*)",
+      "Bash(./devbox:*)",
+      "Bash(make help:*)",
+      "Bash(make test:*)",
+      "Bash(make build:*)",
+      "Bash(./rig:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
