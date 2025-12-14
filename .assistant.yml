@@ -1,5 +1,0 @@
-languages:
-  java:
-    version: "21"
-    build_system: gradle
-    build_system_version: "8.5"
