@@ -16,14 +16,13 @@ runtimes, build tools, and AI agent CLIs (Claude, Gemini, Codex, GitHub CLI).
 Containers are persistent between sessions and automatically rebuild
 when configuration changes.
 
-Usage:
-  rig           Enter the container (uses configured shell)
-  rig init      Initialize a new workspace with .rig.yml
+Commands:
+  rig up        Enter the container (uses configured shell)
   rig down      Stop the container (preserves state)
+  rig destroy   Stop container and remove images
+  rig list      List running rig containers
+  rig init      Initialize a new workspace with .rig.yml
   rig rebuild   Force a clean rebuild of the image`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		return runSession(nil) // Uses configured shell from .rig.yml
-	},
 }
 
 // Execute runs the root command

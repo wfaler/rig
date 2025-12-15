@@ -6,7 +6,7 @@ Rig creates isolated Docker containers pre-configured with your language runtime
 
 ## Why Rig?
 
-- **Zero Setup** — Define your stack in YAML, run `rig`, and you're coding
+- **Zero Setup** — Define your stack in YAML, run `rig up`, and you're coding
 - **AI Agents Ready** — Claude Code, Gemini CLI, OpenAI Codex and GitHub CLI pre-installed
 - **VS Code in Browser** — Optional code-server with language extensions, auto-configured
 - **Testcontainers Support** — Docker-in-Docker works out of the box (**without** needing privileged mode)
@@ -22,7 +22,7 @@ VS Code Dev Containers are powerful, but they come with trade-offs that Rig avoi
 | **Config complexity** | Single `.rig.yml` (~10 lines) | `devcontainer.json` + Dockerfile + features |
 | **IDE lock-in** | Any editor, terminal, or browser | VS Code (or compatible editors) |
 | **AI assistants** | Claude Code, Gemini, OpenAI CLI pre-installed | Manual setup required |
-| **Setup time** | `rig init && rig` | Configure JSON, choose features, debug builds |
+| **Setup time** | `rig init && rig up` | Configure JSON, choose features, debug builds |
 | **Testcontainers** | Works out of the box | Requires manual Docker-in-Docker setup |
 | **Branch switching** | Same container, instant | Often rebuilds per branch |
 
@@ -43,7 +43,7 @@ Dev Containers give you maximum flexibility—and maximum decisions. Rig makes s
 
 ### Terminal-native, IDE-optional
 
-Rig is built for developers who live in the terminal. Run `rig` and you're in a shell with everything ready. Want VS Code? Enable `code_server` and open it in your browser—on any machine, any OS.
+Rig is built for developers who live in the terminal. Run `rig up` and you're in a shell with everything ready. Want VS Code? Enable `code_server` and open it in your browser—on any machine, any OS.
 
 Dev Containers assume you're opening your project in VS Code. Rig assumes you might be SSHing from an iPad, pairing over tmux, or running Claude Code headless on a CI server.
 
@@ -72,7 +72,7 @@ cd your-project
 rig init
 
 # Edit .rig.yml to your needs, then:
-rig
+rig up
 ```
 
 That's it. You're in a container with your languages, tools, and AI assistants ready to go.
@@ -138,7 +138,10 @@ Run `rig init` to see all recommended extensions for each language.
 
 | Command | Description |
 |---------|-------------|
-| `rig` | Enter the container (builds if needed) |
+| `rig up` | Enter the container (builds if needed) |
+| `rig down [name]` | Stop the container (preserves state) |
+| `rig destroy [name]` | Stop container and remove all images |
+| `rig list` | List running rig containers |
 | `rig init` | Create `.rig.yml` template |
 | `rig rebuild` | Force clean rebuild of image |
 
@@ -210,7 +213,11 @@ make install    # Install to $GOPATH/bin
 rig/
 ├── main.go                 # Entry point
 ├── cmd/                    # CLI commands (Cobra)
-│   ├── root.go             # Root command (enters container)
+│   ├── root.go             # Root command (shows help)
+│   ├── up.go               # rig up
+│   ├── down.go             # rig down
+│   ├── destroy.go          # rig destroy
+│   ├── list.go             # rig list
 │   ├── init.go             # rig init
 │   ├── rebuild.go          # rig rebuild
 │   └── session.go          # Container session logic

@@ -141,6 +141,43 @@ func (c *Client) GetContainerImage(ctx context.Context, containerID string) (str
 	return info.Config.Image, nil
 }
 
+// RigContainer represents a rig container with its status info
+type RigContainer struct {
+	Name    string
+	ID      string
+	Status  string
+	Running bool
+	Image   string
+}
+
+// ListRigContainers returns running containers with names starting with "rig-"
+func (c *Client) ListRigContainers(ctx context.Context) ([]RigContainer, error) {
+	containers, err := c.cli.ContainerList(ctx, container.ListOptions{
+		All: false, // Only running containers
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing containers: %w", err)
+	}
+
+	var rigContainers []RigContainer
+	for _, ctr := range containers {
+		for _, name := range ctr.Names {
+			// Container names in Docker API are prefixed with "/"
+			if strings.HasPrefix(name, "/rig-") {
+				rigContainers = append(rigContainers, RigContainer{
+					Name:    strings.TrimPrefix(name, "/"),
+					ID:      ctr.ID[:12],
+					Status:  ctr.Status,
+					Running: ctr.State == "running",
+					Image:   ctr.Image,
+				})
+				break
+			}
+		}
+	}
+	return rigContainers, nil
+}
+
 // parsePortMappings converts port specs to Docker port structures
 func parsePortMappings(ports []string) (nat.PortSet, nat.PortMap, error) {
 	exposedPorts := nat.PortSet{}

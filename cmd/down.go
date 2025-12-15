@@ -11,15 +11,19 @@ import (
 )
 
 var downCmd = &cobra.Command{
-	Use:   "down",
+	Use:   "down [name]",
 	Short: "Stop the rig container without destroying it",
 	Long: `Stops the running container while preserving its state.
 
 The container is stopped but not removed, so any state inside the container
 (installed packages, files outside /workspace, etc.) will be preserved.
 
-Use 'rig' to start the container again.
+If [name] is provided, stops the container with that project name.
+Otherwise, stops the container for the current directory.
+
+Use 'rig up' to start the container again.
 Use 'rig rebuild' if you want to completely remove and rebuild the container.`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: runDown,
 }
 
@@ -30,14 +34,19 @@ func init() {
 func runDown(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
-	// Get current working directory
-	cwd, err := os.Getwd()
-	if err != nil {
-		return fmt.Errorf("getting current directory: %w", err)
+	var projectName string
+	if len(args) > 0 {
+		// Use provided name
+		projectName = args[0]
+	} else {
+		// Get current working directory
+		cwd, err := os.Getwd()
+		if err != nil {
+			return fmt.Errorf("getting current directory: %w", err)
+		}
+		projectName = project.GetProjectName(cwd)
 	}
 
-	// Generate project name and container name
-	projectName := project.GetProjectName(cwd)
 	containerName := project.ContainerName(projectName)
 
 	// Create Docker client
