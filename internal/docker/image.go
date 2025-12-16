@@ -10,16 +10,16 @@ import (
 	"os"
 	"strings"
 
-	"github.com/docker/docker/api/types"
+	cerrdefs "github.com/containerd/errdefs"
+	"github.com/docker/docker/api/types/build"
 	"github.com/docker/docker/api/types/image"
-	"github.com/docker/docker/client"
 )
 
 // ImageExists checks if an image with the given ref exists locally
 func (c *Client) ImageExists(ctx context.Context, imageRef string) (bool, error) {
-	_, _, err := c.cli.ImageInspectWithRaw(ctx, imageRef)
+	_, err := c.cli.ImageInspect(ctx, imageRef)
 	if err != nil {
-		if client.IsErrNotFound(err) {
+		if cerrdefs.IsNotFound(err) {
 			return false, nil
 		}
 		return false, fmt.Errorf("inspecting image: %w", err)
@@ -35,7 +35,7 @@ func (c *Client) BuildImage(ctx context.Context, dockerfile string, imageRef str
 		return fmt.Errorf("creating build context: %w", err)
 	}
 
-	resp, err := c.cli.ImageBuild(ctx, tarBuf, types.ImageBuildOptions{
+	resp, err := c.cli.ImageBuild(ctx, tarBuf, build.ImageBuildOptions{
 		Tags:        []string{imageRef},
 		Dockerfile:  "Dockerfile",
 		Remove:      true, // Remove intermediate containers

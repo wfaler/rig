@@ -115,67 +115,67 @@ func TestGenerateBuildSystemInstall(t *testing.T) {
 		{
 			name:         "node yarn",
 			lang:         "node",
-			cfg:          config.LanguageConfig{BuildSystem: "yarn"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"yarn": "true"}},
 			wantContains: []string{"npm install -g yarn"},
 		},
 		{
 			name:         "node pnpm",
 			lang:         "node",
-			cfg:          config.LanguageConfig{BuildSystem: "pnpm"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"pnpm": "true"}},
 			wantContains: []string{"npm install -g pnpm"},
 		},
 		{
 			name: "node npm returns empty",
 			lang: "node",
-			cfg:  config.LanguageConfig{BuildSystem: "npm"},
+			cfg:  config.LanguageConfig{BuildSystems: map[string]string{"npm": "true"}},
 			want: "",
 		},
 		{
 			name:         "python poetry",
 			lang:         "python",
-			cfg:          config.LanguageConfig{BuildSystem: "poetry"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"poetry": "true"}},
 			wantContains: []string{"pip install poetry"},
 		},
 		{
 			name:         "python poetry with version",
 			lang:         "python",
-			cfg:          config.LanguageConfig{BuildSystem: "poetry", BuildSystemVersion: "1.7.0"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"poetry": "1.7.0"}},
 			wantContains: []string{"pip install poetry==1.7.0"},
 		},
 		{
 			name:         "python pipenv",
 			lang:         "python",
-			cfg:          config.LanguageConfig{BuildSystem: "pipenv"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"pipenv": "true"}},
 			wantContains: []string{"pip install pipenv"},
 		},
 		{
 			name:         "java gradle via SDKMAN",
 			lang:         "java",
-			cfg:          config.LanguageConfig{BuildSystem: "gradle"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"gradle": "true"}},
 			wantContains: []string{"sdkman-init.sh", "sdk install gradle"},
 		},
 		{
 			name:         "java gradle with version via SDKMAN",
 			lang:         "java",
-			cfg:          config.LanguageConfig{BuildSystem: "gradle", BuildSystemVersion: "8.5"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"gradle": "8.5"}},
 			wantContains: []string{"sdk install gradle 8.5"},
 		},
 		{
 			name:         "java maven via SDKMAN",
 			lang:         "java",
-			cfg:          config.LanguageConfig{BuildSystem: "maven"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"maven": "true"}},
 			wantContains: []string{"sdk install maven"},
 		},
 		{
 			name:         "java sbt via SDKMAN",
 			lang:         "java",
-			cfg:          config.LanguageConfig{BuildSystem: "sbt"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"sbt": "true"}},
 			wantContains: []string{"sdk install sbt"},
 		},
 		{
 			name:         "ruby bundler",
 			lang:         "ruby",
-			cfg:          config.LanguageConfig{BuildSystem: "bundler"},
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"bundler": "true"}},
 			wantContains: []string{"gem install bundler"},
 		},
 		{
@@ -251,6 +251,92 @@ func TestVSCodeExtensionsMapping(t *testing.T) {
 			exts, ok := VSCodeExtensionsForLanguage[lang]
 			assert.True(t, ok, "language %s should have extensions defined", lang)
 			assert.NotEmpty(t, exts, "language %s should have at least one extension", lang)
+		})
+	}
+}
+
+func TestGenerateBuildSystemsInstall(t *testing.T) {
+	tests := []struct {
+		name         string
+		lang         string
+		cfg          config.LanguageConfig
+		wantContains []string
+		wantEmpty    bool
+	}{
+		{
+			name:      "no build systems returns empty",
+			lang:      "java",
+			cfg:       config.LanguageConfig{},
+			wantEmpty: true,
+		},
+		{
+			name: "single build system via new format",
+			lang: "java",
+			cfg: config.LanguageConfig{
+				BuildSystems: map[string]string{
+					"gradle": "8.5",
+				},
+			},
+			wantContains: []string{"sdk install gradle 8.5"},
+		},
+		{
+			name: "multiple java build systems",
+			lang: "java",
+			cfg: config.LanguageConfig{
+				BuildSystems: map[string]string{
+					"gradle": "8.5",
+					"maven":  "true",
+					"sbt":    "1.9.8",
+				},
+			},
+			wantContains: []string{
+				"sdk install gradle 8.5",
+				"sdk install maven",
+				"sdk install sbt 1.9.8",
+			},
+		},
+		{
+			name: "multiple python build systems",
+			lang: "python",
+			cfg: config.LanguageConfig{
+				BuildSystems: map[string]string{
+					"poetry": "1.8.0",
+					"pipenv": "latest",
+				},
+			},
+			wantContains: []string{
+				"pip install poetry==1.8.0",
+				"pip install pipenv",
+			},
+		},
+		{
+			name: "multiple node build systems",
+			lang: "node",
+			cfg: config.LanguageConfig{
+				BuildSystems: map[string]string{
+					"yarn": "true",
+					"pnpm": "true",
+				},
+			},
+			wantContains: []string{
+				"npm install -g yarn",
+				"npm install -g pnpm",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := GenerateBuildSystemsInstall(tt.lang, tt.cfg)
+
+			if tt.wantEmpty {
+				assert.Empty(t, result)
+				return
+			}
+
+			for _, want := range tt.wantContains {
+				assert.Contains(t, result, want)
+			}
 		})
 	}
 }

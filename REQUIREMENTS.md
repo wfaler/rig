@@ -80,8 +80,8 @@ The container entrypoint:
 languages:
   <language>:
     version: "<version>"                    # "lts", "latest", or specific
-    build_system: "<system>"                # optional
-    build_system_version: "<version>"       # optional
+    build_systems:                          # optional, multiple supported
+      <system>: "<version>"                 # version string or "true" for latest
 
 # Port mappings
 ports:
@@ -170,14 +170,19 @@ Installed via npm:
 languages:
   node:
     version: "lts"
-    build_system: npm
+    build_systems:
+      npm: true
+      yarn: true
   python:
     version: "3.12"
-    build_system: poetry
-    build_system_version: "1.7.0"
+    build_systems:
+      poetry: "1.7.0"
+      pip: true
   java:
     version: "21"
-    build_system: gradle
+    build_systems:
+      gradle: "8.5"
+      maven: true
 
 ports:
   - "3000"

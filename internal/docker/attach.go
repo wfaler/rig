@@ -41,7 +41,9 @@ func (c *Client) Attach(ctx context.Context, containerID string, command []strin
 	if err != nil {
 		return fmt.Errorf("setting raw terminal: %w", err)
 	}
-	defer term.RestoreTerminal(fd, oldState)
+	defer func() {
+		_ = term.RestoreTerminal(fd, oldState)
+	}()
 
 	// Attach to exec instance
 	attachResp, err := c.cli.ContainerExecAttach(ctx, execResp.ID, container.ExecAttachOptions{
@@ -128,7 +130,7 @@ func (c *Client) resizeExecTTY(ctx context.Context, execID string) {
 		return
 	}
 
-	c.cli.ContainerExecResize(ctx, execID, container.ResizeOptions{
+	_ = c.cli.ContainerExecResize(ctx, execID, container.ResizeOptions{
 		Height: uint(ws.Height),
 		Width:  uint(ws.Width),
 	})

@@ -37,7 +37,7 @@ func TestGenerate(t *testing.T) {
 			name: "with node configured",
 			config: &config.Config{
 				Languages: map[string]config.LanguageConfig{
-					"node": {Version: "lts", BuildSystem: "npm"},
+					"node": {Version: "lts", BuildSystems: map[string]string{"npm": "true"}},
 				},
 				Env: map[string]string{},
 			},
@@ -53,8 +53,8 @@ func TestGenerate(t *testing.T) {
 			name: "with multiple languages",
 			config: &config.Config{
 				Languages: map[string]config.LanguageConfig{
-					"node":   {Version: "20", BuildSystem: "yarn"},
-					"python": {Version: "3.12", BuildSystem: "poetry"},
+					"node":   {Version: "20", BuildSystems: map[string]string{"yarn": "true"}},
+					"python": {Version: "3.12", BuildSystems: map[string]string{"poetry": "true"}},
 					"go":     {Version: "1.22"},
 				},
 				Env: map[string]string{},
@@ -85,7 +85,7 @@ func TestGenerate(t *testing.T) {
 			name: "with java and gradle",
 			config: &config.Config{
 				Languages: map[string]config.LanguageConfig{
-					"java": {Version: "21", BuildSystem: "gradle", BuildSystemVersion: "8.5"},
+					"java": {Version: "21", BuildSystems: map[string]string{"gradle": "8.5"}},
 				},
 				Env: map[string]string{},
 			},
@@ -233,7 +233,7 @@ func TestGenerateWithCodeServer(t *testing.T) {
 func TestGenerateWithJavaIncludesSDKMAN(t *testing.T) {
 	cfg := &config.Config{
 		Languages: map[string]config.LanguageConfig{
-			"java": {Version: "17", BuildSystem: "maven"},
+			"java": {Version: "17", BuildSystems: map[string]string{"maven": "true"}},
 		},
 		Env: map[string]string{},
 	}

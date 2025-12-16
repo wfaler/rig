@@ -85,10 +85,20 @@ Create `.rig.yml` in your project root:
 languages:
   node:
     version: "lts"
-    build_system: yarn
+    build_systems:
+      yarn: true
+      pnpm: "8.15"       # specify version
   python:
     version: "3.12"
-    build_system: poetry
+    build_systems:
+      poetry: "1.8.0"
+      pip: true
+  java:
+    version: "21"
+    build_systems:
+      gradle: "8.5"
+      maven: true
+      sbt: "1.9.8"
 
 ports:
   - "3000"

@@ -95,9 +95,8 @@ func (c *Config) GetAllPorts() []string {
 
 // LanguageConfig defines a language runtime configuration
 type LanguageConfig struct {
-	Version            string `yaml:"version"`              // "20.10.0", "lts", "latest", or "" (defaults to latest)
-	BuildSystem        string `yaml:"build_system"`         // npm, yarn, gradle, etc.
-	BuildSystemVersion string `yaml:"build_system_version"` // optional version for build system
+	Version      string            `yaml:"version"`       // "20.10.0", "lts", "latest", or "" (defaults to latest)
+	BuildSystems map[string]string `yaml:"build_systems"` // Build systems with optional versions (e.g., "gradle": "8.5" or "maven": "true")
 }
 
 // SupportedLanguages lists valid language identifiers
@@ -163,11 +162,13 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("unsupported language: %s (supported: go, node, rust, java, python, ruby)", lang)
 		}
 
-		if langCfg.BuildSystem != "" {
-			validSystems := BuildSystemsForLanguage[lang]
-			if !contains(validSystems, langCfg.BuildSystem) {
+		// Validate build systems (supports both legacy single and new multiple format)
+		buildSystems := langCfg.GetBuildSystems()
+		validSystems := BuildSystemsForLanguage[lang]
+		for bs := range buildSystems {
+			if !contains(validSystems, bs) {
 				return fmt.Errorf("invalid build system %q for language %s (valid: %s)",
-					langCfg.BuildSystem, lang, strings.Join(validSystems, ", "))
+					bs, lang, strings.Join(validSystems, ", "))
 			}
 		}
 	}
@@ -199,6 +200,25 @@ func (lc *LanguageConfig) GetVersion() string {
 		return "latest"
 	}
 	return lc.Version
+}
+
+// GetBuildSystems returns a normalized map of build systems to their versions.
+// Values of "true" or "latest" are normalized to "" (meaning latest/default version).
+// Returns nil if no build systems are configured.
+func (lc *LanguageConfig) GetBuildSystems() map[string]string {
+	if len(lc.BuildSystems) == 0 {
+		return nil
+	}
+
+	result := make(map[string]string)
+	for bs, ver := range lc.BuildSystems {
+		if ver == "true" || ver == "latest" {
+			result[bs] = ""
+		} else {
+			result[bs] = ver
+		}
+	}
+	return result
 }
 
 // validatePortSpec validates a port specification in format "port" or "host:container"

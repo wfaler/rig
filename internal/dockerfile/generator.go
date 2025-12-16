@@ -27,9 +27,7 @@ type TemplateData struct {
 func Generate(cfg *config.Config) (string, error) {
 	// Build language installation commands
 	var langInstalls []string
-	var languages []string
 	for lang, langCfg := range cfg.Languages {
-		languages = append(languages, lang)
 		install := GenerateLanguageInstall(lang, langCfg)
 		if install != "" {
 			langInstalls = append(langInstalls, install)

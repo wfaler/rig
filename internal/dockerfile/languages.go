@@ -31,20 +31,42 @@ func GenerateLanguageInstall(lang string, cfg config.LanguageConfig) string {
 }
 
 // GenerateBuildSystemInstall returns the Dockerfile RUN commands for installing a build system
+// Deprecated: Use GenerateBuildSystemsInstall for multiple build systems support
 func GenerateBuildSystemInstall(lang string, cfg config.LanguageConfig) string {
-	if cfg.BuildSystem == "" {
+	return GenerateBuildSystemsInstall(lang, cfg)
+}
+
+// GenerateBuildSystemsInstall returns the Dockerfile RUN commands for installing all configured build systems
+func GenerateBuildSystemsInstall(lang string, cfg config.LanguageConfig) string {
+	buildSystems := cfg.GetBuildSystems()
+	if len(buildSystems) == 0 {
 		return ""
 	}
 
+	var result string
+	for bs, version := range buildSystems {
+		install := generateSingleBuildSystemInstall(lang, bs, version)
+		if install != "" {
+			if result != "" {
+				result += "\n"
+			}
+			result += install
+		}
+	}
+	return result
+}
+
+// generateSingleBuildSystemInstall returns the Dockerfile RUN command for a single build system
+func generateSingleBuildSystemInstall(lang, buildSystem, version string) string {
 	switch lang {
 	case "node":
-		return installNodeBuildSystem(cfg.BuildSystem)
+		return installNodeBuildSystem(buildSystem)
 	case "python":
-		return installPythonBuildSystem(cfg.BuildSystem, cfg.BuildSystemVersion)
+		return installPythonBuildSystem(buildSystem, version)
 	case "java":
-		return installJavaBuildSystemWithSDKMAN(cfg.BuildSystem, cfg.BuildSystemVersion)
+		return installJavaBuildSystemWithSDKMAN(buildSystem, version)
 	case "ruby":
-		return installRubyBuildSystem(cfg.BuildSystem)
+		return installRubyBuildSystem(buildSystem)
 	default:
 		return ""
 	}

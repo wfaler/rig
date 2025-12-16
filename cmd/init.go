@@ -31,21 +31,28 @@ languages:
   # Example configurations:
   # node:
   #   version: "lts"           # "lts", "latest", or specific version like "20"
-  #   build_system: npm        # npm, yarn, or pnpm
+  #   build_systems:           # Multiple build systems supported
+  #     yarn: true             # "true" or "latest" for latest version
+  #     pnpm: "8.15"           # or specify a version
   # python:
   #   version: "3.12"
-  #   build_system: poetry
-  #   build_system_version: "1.7.0"
+  #   build_systems:
+  #     poetry: "1.8.0"
+  #     pip: true              # pip comes with Python
   # java:
   #   version: "21"
-  #   build_system: gradle
+  #   build_systems:
+  #     gradle: "8.5"
+  #     maven: true
+  #     sbt: "1.9.8"
   # go:
   #   version: "1.22"
   # rust:
   #   version: "latest"
   # ruby:
   #   version: "3.3"
-  #   build_system: bundler
+  #   build_systems:
+  #     bundler: true
 
 ports: []
   # Port mappings in "host:container" or "port" format:

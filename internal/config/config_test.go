@@ -21,11 +21,12 @@ func TestParse(t *testing.T) {
 languages:
   node:
     version: "lts"
-    build_system: npm
+    build_systems:
+      npm: "true"
   python:
     version: "3.12"
-    build_system: poetry
-    build_system_version: "1.7.0"
+    build_systems:
+      poetry: "1.7.0"
 ports:
   - "8080:8080"
   - "3000"
@@ -35,13 +36,12 @@ env:
 			want: &Config{
 				Languages: map[string]LanguageConfig{
 					"node": {
-						Version:     "lts",
-						BuildSystem: "npm",
+						Version:      "lts",
+						BuildSystems: map[string]string{"npm": "true"},
 					},
 					"python": {
-						Version:            "3.12",
-						BuildSystem:        "poetry",
-						BuildSystemVersion: "1.7.0",
+						Version:      "3.12",
+						BuildSystems: map[string]string{"poetry": "1.7.0"},
 					},
 				},
 				Ports: []string{"8080:8080", "3000"},
@@ -153,7 +153,7 @@ func TestConfigValidation(t *testing.T) {
 			name: "valid node config",
 			config: Config{
 				Languages: map[string]LanguageConfig{
-					"node": {Version: "lts", BuildSystem: "npm"},
+					"node": {Version: "lts", BuildSystems: map[string]string{"npm": "true"}},
 				},
 			},
 			wantErr: false,
@@ -162,9 +162,9 @@ func TestConfigValidation(t *testing.T) {
 			name: "valid multi-language config",
 			config: Config{
 				Languages: map[string]LanguageConfig{
-					"node":   {Version: "20", BuildSystem: "yarn"},
-					"python": {Version: "3.12", BuildSystem: "poetry"},
-					"java":   {Version: "21", BuildSystem: "gradle"},
+					"node":   {Version: "20", BuildSystems: map[string]string{"yarn": "true"}},
+					"python": {Version: "3.12", BuildSystems: map[string]string{"poetry": "1.8.0"}},
+					"java":   {Version: "21", BuildSystems: map[string]string{"gradle": "8.5"}},
 				},
 			},
 			wantErr: false,
@@ -183,7 +183,7 @@ func TestConfigValidation(t *testing.T) {
 			name: "invalid build system for language",
 			config: Config{
 				Languages: map[string]LanguageConfig{
-					"node": {BuildSystem: "gradle"},
+					"node": {BuildSystems: map[string]string{"gradle": "true"}},
 				},
 			},
 			wantErr: true,
@@ -398,4 +398,155 @@ languages:
 	require.NoError(t, err)
 	assert.Equal(t, "zsh", cfg.Shell)
 	assert.Equal(t, "zsh", cfg.GetShell())
+}
+
+func TestGetBuildSystems(t *testing.T) {
+	tests := []struct {
+		name   string
+		config LanguageConfig
+		want   map[string]string
+	}{
+		{
+			name:   "empty config returns nil",
+			config: LanguageConfig{},
+			want:   nil,
+		},
+		{
+			name: "build_systems with versions",
+			config: LanguageConfig{
+				BuildSystems: map[string]string{
+					"gradle": "8.5",
+					"maven":  "3.9",
+				},
+			},
+			want: map[string]string{"gradle": "8.5", "maven": "3.9"},
+		},
+		{
+			name: "build_systems with true normalizes to empty",
+			config: LanguageConfig{
+				BuildSystems: map[string]string{
+					"gradle": "true",
+					"maven":  "latest",
+					"sbt":    "1.9.8",
+				},
+			},
+			want: map[string]string{"gradle": "", "maven": "", "sbt": "1.9.8"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.config.GetBuildSystems()
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParseWithBuildSystems(t *testing.T) {
+	yaml := `
+languages:
+  java:
+    version: "21"
+    build_systems:
+      gradle: "8.5"
+      maven: "true"
+      sbt: "1.9.8"
+  python:
+    version: "3.12"
+    build_systems:
+      poetry: "1.8.0"
+      pip: "latest"
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+
+	// Check Java build systems
+	javaCfg := cfg.Languages["java"]
+	assert.Equal(t, "21", javaCfg.Version)
+	assert.Equal(t, map[string]string{
+		"gradle": "8.5",
+		"maven":  "true",
+		"sbt":    "1.9.8",
+	}, javaCfg.BuildSystems)
+
+	// Test normalized GetBuildSystems
+	javaBuildSystems := javaCfg.GetBuildSystems()
+	assert.Equal(t, "8.5", javaBuildSystems["gradle"])
+	assert.Equal(t, "", javaBuildSystems["maven"])
+	assert.Equal(t, "1.9.8", javaBuildSystems["sbt"])
+
+	// Check Python build systems
+	pythonCfg := cfg.Languages["python"]
+	pythonBuildSystems := pythonCfg.GetBuildSystems()
+	assert.Equal(t, "1.8.0", pythonBuildSystems["poetry"])
+	assert.Equal(t, "", pythonBuildSystems["pip"])
+}
+
+func TestValidateMultipleBuildSystems(t *testing.T) {
+	tests := []struct {
+		name    string
+		config  Config
+		wantErr bool
+		errMsg  string
+	}{
+		{
+			name: "valid multiple build systems",
+			config: Config{
+				Languages: map[string]LanguageConfig{
+					"java": {
+						Version: "21",
+						BuildSystems: map[string]string{
+							"gradle": "8.5",
+							"maven":  "true",
+							"sbt":    "1.9.8",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "invalid build system in multiple",
+			config: Config{
+				Languages: map[string]LanguageConfig{
+					"java": {
+						Version: "21",
+						BuildSystems: map[string]string{
+							"gradle": "8.5",
+							"npm":    "true", // npm is not valid for Java
+						},
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "invalid build system",
+		},
+		{
+			name: "valid python multiple build systems",
+			config: Config{
+				Languages: map[string]LanguageConfig{
+					"python": {
+						Version: "3.12",
+						BuildSystems: map[string]string{
+							"poetry": "1.8.0",
+							"pip":    "true",
+						},
+					},
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.config.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
 }

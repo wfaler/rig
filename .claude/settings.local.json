@@ -14,7 +14,10 @@
       "Bash(make build:*)",
       "Bash(./rig:*)",
       "Bash(ls:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(make lint:*)",
+      "Bash(go install:*)",
+      "Bash(go doc:*)"
     ]
   }
 }
