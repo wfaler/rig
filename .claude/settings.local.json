@@ -17,7 +17,8 @@
       "Bash(grep:*)",
       "Bash(make lint:*)",
       "Bash(go install:*)",
-      "Bash(go doc:*)"
+      "Bash(go doc:*)",
+      "WebFetch(domain:github.com)"
     ]
   }
 }
