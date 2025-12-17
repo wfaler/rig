@@ -7,8 +7,8 @@ Rig creates isolated Docker containers pre-configured with your language runtime
 ### Installing
 Mac:
 ```
-brew tap wfaler/tap
-brew install wfaler/tap/rig
+brew tap-pin wfaler/tap
+brew install rig
 ```
 Other platforms:
 * Have Go installed
