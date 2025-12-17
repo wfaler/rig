@@ -4,6 +4,17 @@
 
 Rig creates isolated Docker containers pre-configured with your language runtimes, build tools, AI coding assistants and optionally code-server (VS Code in the browser). One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
 
+### Installing
+Mac:
+```
+brew tap wfaler/tap
+brew install rig
+```
+Other platforms:
+* Have Go installed
+* Run `make build`
+* Move `rig` binary to somewhere on your path.
+
 ## Why Rig?
 
 - **Zero Setup** — Define your stack in YAML, run `rig up`, and you're coding
