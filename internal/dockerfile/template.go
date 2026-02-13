@@ -119,8 +119,11 @@ RUN curl -s "https://get.sdkman.io?rcupdate=false" | bash
 RUN mise use --global node@lts
 {{ end }}
 
-# Install AI agents via npm
-RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g @anthropic-ai/claude-code @google/gemini-cli openai
+# Install Claude Code (native binary - recommended method)
+RUN curl -fsSL https://claude.ai/install.sh | bash
+
+# Install other AI agents via npm
+RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g @google/gemini-cli openai
 
 {{ .BuildSystemInstalls }}
 

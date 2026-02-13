@@ -43,7 +43,7 @@ env: {}
 
 # VS Code in browser (code-server)
 code_server:
-  enabled: true
+  enabled: false 
   port: 8080                           # default: 8080
   theme: "Default Dark Modern"         # VS Code theme
   extensions:                          # extensions to install
