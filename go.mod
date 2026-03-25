@@ -1,6 +1,6 @@
 module github.com/wfaler/rig
 
-go 1.25.5
+go 1.26.1
 
 require (
 	github.com/containerd/errdefs v1.0.0

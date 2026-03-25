@@ -101,6 +101,10 @@ SHELL ["/bin/bash", "-c"]
 RUN curl https://mise.run | sh
 ENV PATH="/home/developer/.local/bin:${PATH}"
 
+# Avoid freethreaded Python builds which are missing the lib directory
+ENV MISE_PYTHON_PRECOMPILED_FLAVOR=install_only_stripped
+ENV MISE_PYTHON_FREETHREADED=0
+
 {{ if .HasJava }}
 # Install SDKMAN for Java and JVM tools
 RUN curl -s "https://get.sdkman.io?rcupdate=false" | bash

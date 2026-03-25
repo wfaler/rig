@@ -26,7 +26,7 @@ func TestGenerate(t *testing.T) {
 				"FROM debian:bookworm-slim",
 				"docker-ce-cli",
 				"mise use --global node@lts", // Node LTS installed for AI agents
-				"npm install -g @anthropic-ai/claude-code",
+				"curl -fsSL https://claude.ai/install.sh | bash",
 				"curl https://mise.run", // Mise installed
 			},
 			wantNotContain: []string{
@@ -62,6 +62,7 @@ func TestGenerate(t *testing.T) {
 			wantContains: []string{
 				"mise use --global node@20",
 				"mise use --global python@3.12",
+				"mise where python",
 				"mise use --global go@1.22",
 				"npm install -g yarn",
 				"pip install poetry",

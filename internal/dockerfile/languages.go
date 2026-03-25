@@ -18,7 +18,7 @@ func GenerateLanguageInstall(lang string, cfg config.LanguageConfig) string {
 	case "node":
 		return installWithMise("node", version)
 	case "python":
-		return installWithMise("python", version)
+		return installPython(version)
 	case "rust":
 		return installWithMise("rust", version)
 	case "ruby":
@@ -89,6 +89,28 @@ func installWithMise(lang, version string) string {
 
 	return fmt.Sprintf(`# Install %s via Mise
 RUN mise use --global %s@%s`, lang, lang, miseVersion)
+}
+
+// installPython generates Mise install commands for Python with a post-install
+// fix for the missing lib directory issue in some precompiled builds
+func installPython(version string) string {
+	miseVersion := version
+	if version == "latest" || version == "lts" {
+		miseVersion = "latest"
+	}
+
+	return fmt.Sprintf(`# Install Python via Mise
+RUN mise use --global python@%s \
+    && PYTHON_DIR=$(mise where python) \
+    && if [ ! -d "$PYTHON_DIR/lib" ]; then \
+         if [ -d "$PYTHON_DIR/install/lib" ]; then \
+           ln -s "$PYTHON_DIR/install/lib" "$PYTHON_DIR/lib"; \
+         elif [ -d "$PYTHON_DIR/lib64" ]; then \
+           ln -s "$PYTHON_DIR/lib64" "$PYTHON_DIR/lib"; \
+         else \
+           mkdir -p "$PYTHON_DIR/lib"; \
+         fi; \
+       fi`, miseVersion)
 }
 
 // installJavaWithSDKMAN installs Java using SDKMAN
