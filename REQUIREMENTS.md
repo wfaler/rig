@@ -118,7 +118,7 @@ code_server:
 | Language | Key | Versions | Build Systems |
 |----------|-----|----------|---------------|
 | Node.js | `node` | `lts`, `latest`, `20`, `20.10.0` | `npm`, `yarn`, `pnpm` |
-| Python | `python` | `latest`, `3.12`, `3.12.1` | `pip`, `poetry`, `pipenv` |
+| Python | `python` | `latest`, `3.12`, `3.12.1` | `pip`, `poetry`, `pipenv`, `uv` |
 | Go | `go` | `latest`, `1.22`, `1.22.1` | (built-in) |
 | Java | `java` | `latest`, `21`, `17` | `gradle`, `maven`, `sbt`, `ant` |
 | Rust | `rust` | `latest`, `1.75`, `1.75.0` | `cargo` |

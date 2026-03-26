@@ -132,7 +132,7 @@ code_server:
 | Language | Versions | Build Systems |
 |----------|----------|---------------|
 | **Node** | lts, latest, specific (e.g., "20") | npm, yarn, pnpm |
-| **Python** | latest, specific (e.g., "3.12") | pip, poetry, pipenv |
+| **Python** | latest, specific (e.g., "3.12") | pip, poetry, pipenv, uv |
 | **Go** | latest, specific (e.g., "1.22") | built-in |
 | **Java/Kotlin/Scala** | latest, specific (e.g., "21") | gradle, maven, sbt, ant |
 | **Rust** | latest, specific (e.g., "1.75") | cargo |

@@ -149,6 +149,18 @@ func TestGenerateBuildSystemInstall(t *testing.T) {
 			wantContains: []string{"pip install pipenv"},
 		},
 		{
+			name:         "python uv",
+			lang:         "python",
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"uv": "true"}},
+			wantContains: []string{"pip install uv"},
+		},
+		{
+			name:         "python uv with version",
+			lang:         "python",
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"uv": "0.6.0"}},
+			wantContains: []string{"pip install uv==0.6.0"},
+		},
+		{
 			name:         "java gradle via SDKMAN",
 			lang:         "java",
 			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"gradle": "true"}},

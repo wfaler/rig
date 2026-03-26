@@ -38,6 +38,7 @@ languages:
   #   version: "3.12"
   #   build_systems:
   #     poetry: "1.8.0"
+  #     uv: true               # or specify version like "0.6.0"
   #     pip: true              # pip comes with Python
   # java:
   #   version: "21"

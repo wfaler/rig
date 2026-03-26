@@ -115,7 +115,7 @@ var BuildSystemsForLanguage = map[string][]string{
 	"node":   {"npm", "yarn", "pnpm"},
 	"rust":   {"cargo"},
 	"java":   {"gradle", "maven", "ant", "sbt"},
-	"python": {"pip", "poetry", "pipenv"},
+	"python": {"pip", "poetry", "pipenv", "uv"},
 	"ruby":   {"bundler", "gem"},
 }
 

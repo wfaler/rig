@@ -162,6 +162,13 @@ RUN eval "$(~/.local/bin/mise activate bash)" && pip install poetry`
 	case "pipenv":
 		return `# Install Pipenv
 RUN eval "$(~/.local/bin/mise activate bash)" && pip install pipenv`
+	case "uv":
+		if version != "" {
+			return fmt.Sprintf(`# Install uv %s
+RUN eval "$(~/.local/bin/mise activate bash)" && pip install uv==%s`, version, version)
+		}
+		return `# Install uv
+RUN eval "$(~/.local/bin/mise activate bash)" && pip install uv`
 	case "pip":
 		return "" // pip comes with Python
 	default:
