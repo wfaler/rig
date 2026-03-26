@@ -20,7 +20,7 @@ languages:
   #     maven: true
   #     sbt: "1.9.8"
   go:
-    version: "1.25"
+    version: "1.26"
   # rust:
   #   version: "latest"
   # ruby:

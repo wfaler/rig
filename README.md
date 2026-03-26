@@ -196,6 +196,18 @@ Every rig container includes:
 
 ## How It Works
 
+```mermaid
+graph LR
+    A[.rig.yml] -->|hash| B[Build Image]
+    B --> C[Create Container]
+    C --> D[rig up]
+    D --> E{Container exists?}
+    E -->|Yes| F[Attach Shell]
+    E -->|No| C
+    G[Config Changed?] -->|Yes| B
+    G -->|No| F
+```
+
 1. **Config Hash** — Your `.rig.yml` is hashed to create a unique image tag
 2. **Smart Builds** — Images only rebuild when config changes
 3. **Persistent Containers** — Named `rig-<project>`, reused across sessions

@@ -14,8 +14,8 @@ type DockerClient interface {
 	// ImageExists checks if an image with the given ref exists locally
 	ImageExists(ctx context.Context, imageRef string) (bool, error)
 
-	// BuildImage builds a Docker image from a Dockerfile string
-	BuildImage(ctx context.Context, dockerfile string, imageRef string) error
+	// BuildImage builds a Docker image from a Dockerfile string and optional extra files
+	BuildImage(ctx context.Context, dockerfile string, imageRef string, extraFiles map[string][]byte) error
 
 	// FindContainer returns container ID if it exists, empty string otherwise
 	FindContainer(ctx context.Context, name string) (string, error)

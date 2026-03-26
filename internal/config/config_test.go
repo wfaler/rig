@@ -482,6 +482,62 @@ languages:
 	assert.Equal(t, "", pythonBuildSystems["pip"])
 }
 
+func TestMarkdownServerDefaults(t *testing.T) {
+	// Default: enabled with port 3030
+	cfg := &Config{}
+	assert.True(t, cfg.IsMarkdownServerEnabled())
+	assert.Equal(t, 3030, cfg.GetMarkdownServerPort())
+
+	// Explicitly disabled
+	cfg2 := &Config{MarkdownServer: &MarkdownServerConfig{Enabled: false}}
+	assert.False(t, cfg2.IsMarkdownServerEnabled())
+
+	// Custom port
+	cfg3 := &Config{MarkdownServer: &MarkdownServerConfig{Enabled: true, Port: 4040}}
+	assert.True(t, cfg3.IsMarkdownServerEnabled())
+	assert.Equal(t, 4040, cfg3.GetMarkdownServerPort())
+}
+
+func TestParseWithMarkdownServer(t *testing.T) {
+	yaml := `
+markdown_server:
+  enabled: true
+  port: 4000
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	assert.True(t, cfg.IsMarkdownServerEnabled())
+	assert.Equal(t, 4000, cfg.GetMarkdownServerPort())
+}
+
+func TestParseWithMarkdownServerDisabled(t *testing.T) {
+	yaml := `
+markdown_server:
+  enabled: false
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	assert.False(t, cfg.IsMarkdownServerEnabled())
+}
+
+func TestGetAllPortsIncludesMarkdownServer(t *testing.T) {
+	// Default config (markdown server enabled)
+	cfg := &Config{
+		Ports: []string{"8080"},
+	}
+	ports := cfg.GetAllPorts()
+	assert.Contains(t, ports, "3030")
+	assert.Contains(t, ports, "8080")
+
+	// Markdown server disabled
+	cfg2 := &Config{
+		Ports:          []string{"8080"},
+		MarkdownServer: &MarkdownServerConfig{Enabled: false},
+	}
+	ports2 := cfg2.GetAllPorts()
+	assert.NotContains(t, ports2, "3030")
+}
+
 func TestValidateMultipleBuildSystems(t *testing.T) {
 	tests := []struct {
 		name    string

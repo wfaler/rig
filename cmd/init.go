@@ -68,6 +68,12 @@ env: {}
 # Default shell: zsh (default, with oh-my-zsh), bash, or fish
 # shell: zsh
 
+# Markdown server (renders .md files as HTML with hot-reload)
+# Enabled by default on port 3030. Serves README.md at root.
+# markdown_server:
+#   enabled: false                       # set to false to disable
+#   port: 3030                           # default: 3030
+
 # VS Code in browser (code-server)
 # code_server:
 #   enabled: true

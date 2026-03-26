@@ -11,11 +11,12 @@ import (
 
 // Config represents the .assistant.yml file
 type Config struct {
-	Languages  map[string]LanguageConfig `yaml:"languages"`
-	Ports      []string                  `yaml:"ports"`
-	Env        map[string]string         `yaml:"env"`
-	CodeServer *CodeServerConfig         `yaml:"code_server"`
-	Shell      string                    `yaml:"shell"` // bash (default), zsh, fish
+	Languages      map[string]LanguageConfig `yaml:"languages"`
+	Ports          []string                  `yaml:"ports"`
+	Env            map[string]string         `yaml:"env"`
+	CodeServer     *CodeServerConfig         `yaml:"code_server"`
+	MarkdownServer *MarkdownServerConfig     `yaml:"markdown_server"`
+	Shell          string                    `yaml:"shell"` // bash (default), zsh, fish
 }
 
 // SupportedShells lists valid shell options
@@ -70,6 +71,29 @@ func (c *Config) GetCodeServerExtensions() []string {
 	return c.CodeServer.Extensions
 }
 
+// MarkdownServerConfig defines markdown server settings
+type MarkdownServerConfig struct {
+	Enabled bool `yaml:"enabled"` // Enable/disable markdown server
+	Port    int  `yaml:"port"`    // Port for markdown server (default: 3030)
+}
+
+// IsMarkdownServerEnabled returns true if the markdown server is enabled.
+// The markdown server is enabled by default unless explicitly disabled.
+func (c *Config) IsMarkdownServerEnabled() bool {
+	if c.MarkdownServer == nil {
+		return true // enabled by default
+	}
+	return c.MarkdownServer.Enabled
+}
+
+// GetMarkdownServerPort returns the markdown server port, defaulting to 3030
+func (c *Config) GetMarkdownServerPort() int {
+	if c.MarkdownServer == nil || c.MarkdownServer.Port == 0 {
+		return 3030
+	}
+	return c.MarkdownServer.Port
+}
+
 // GetAllPorts returns all configured ports, including code-server port if enabled
 func (c *Config) GetAllPorts() []string {
 	ports := make([]string, len(c.Ports))
@@ -87,6 +111,20 @@ func (c *Config) GetAllPorts() []string {
 		}
 		if !found {
 			ports = append(ports, csPort)
+		}
+	}
+
+	if c.IsMarkdownServerEnabled() {
+		mdPort := fmt.Sprintf("%d", c.GetMarkdownServerPort())
+		found := false
+		for _, p := range ports {
+			if p == mdPort || strings.HasPrefix(p, mdPort+":") || strings.HasSuffix(p, ":"+mdPort) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			ports = append(ports, mdPort)
 		}
 	}
 

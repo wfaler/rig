@@ -70,13 +70,13 @@ func runSession(command []string) error {
 	if !imageExists {
 		// Generate Dockerfile
 		fmt.Printf("Building image %s...\n", imageRef)
-		dockerfileContent, err := dockerfile.Generate(cfg)
+		buildCtx, err := dockerfile.Generate(cfg)
 		if err != nil {
 			return fmt.Errorf("generating dockerfile: %w", err)
 		}
 
 		// Build image
-		if err := dockerClient.BuildImage(ctx, dockerfileContent, imageRef); err != nil {
+		if err := dockerClient.BuildImage(ctx, buildCtx.Dockerfile, imageRef, buildCtx.ExtraFiles); err != nil {
 			return fmt.Errorf("building image: %w", err)
 		}
 		fmt.Println("Image built successfully")

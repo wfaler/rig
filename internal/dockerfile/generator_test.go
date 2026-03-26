@@ -112,15 +112,15 @@ func TestGenerate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dockerfile, err := Generate(tt.config)
+			buildCtx, err := Generate(tt.config)
 			require.NoError(t, err)
 
 			for _, want := range tt.wantContains {
-				assert.Contains(t, dockerfile, want, "expected Dockerfile to contain: %s", want)
+				assert.Contains(t, buildCtx.Dockerfile, want, "expected Dockerfile to contain: %s", want)
 			}
 
 			for _, notWant := range tt.wantNotContain {
-				assert.NotContains(t, dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
+				assert.NotContains(t, buildCtx.Dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
 			}
 		})
 	}
@@ -134,26 +134,26 @@ func TestGenerateDockerfileStructure(t *testing.T) {
 		Env: map[string]string{},
 	}
 
-	dockerfile, err := Generate(cfg)
+	buildCtx, err := Generate(cfg)
 	require.NoError(t, err)
 
 	// Verify basic structure
-	lines := strings.Split(dockerfile, "\n")
+	lines := strings.Split(buildCtx.Dockerfile, "\n")
 
 	// Should start with FROM
 	assert.True(t, strings.HasPrefix(lines[0], "FROM"), "Dockerfile should start with FROM")
 
 	// Should contain USER developer
-	assert.Contains(t, dockerfile, "USER developer")
+	assert.Contains(t, buildCtx.Dockerfile, "USER developer")
 
 	// Should contain WORKDIR /workspace
-	assert.Contains(t, dockerfile, "WORKDIR /workspace")
+	assert.Contains(t, buildCtx.Dockerfile, "WORKDIR /workspace")
 
 	// Should end with CMD (default shell is zsh)
-	assert.Contains(t, dockerfile, `CMD ["/bin/zsh"]`)
+	assert.Contains(t, buildCtx.Dockerfile, `CMD ["/bin/zsh"]`)
 
 	// Should install Mise
-	assert.Contains(t, dockerfile, "curl https://mise.run")
+	assert.Contains(t, buildCtx.Dockerfile, "curl https://mise.run")
 }
 
 func TestGenerateWithCodeServer(t *testing.T) {
@@ -217,15 +217,76 @@ func TestGenerateWithCodeServer(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dockerfile, err := Generate(tt.config)
+			buildCtx, err := Generate(tt.config)
 			require.NoError(t, err)
 
 			for _, want := range tt.wantContains {
-				assert.Contains(t, dockerfile, want, "expected Dockerfile to contain: %s", want)
+				assert.Contains(t, buildCtx.Dockerfile, want, "expected Dockerfile to contain: %s", want)
 			}
 
 			for _, notWant := range tt.wantNotContain {
-				assert.NotContains(t, dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
+				assert.NotContains(t, buildCtx.Dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
+			}
+		})
+	}
+}
+
+func TestGenerateWithMarkdownServer(t *testing.T) {
+	tests := []struct {
+		name           string
+		config         *config.Config
+		wantContains   []string
+		wantNotContain []string
+	}{
+		{
+			name: "markdown server enabled by default",
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{},
+				Env:       map[string]string{},
+			},
+			wantContains: []string{
+				"npm install -g marked@latest",
+				"rig-md-server.js",
+				"RIG_MD_PORT=3030",
+			},
+		},
+		{
+			name: "markdown server with custom port",
+			config: &config.Config{
+				Languages:      map[string]config.LanguageConfig{},
+				Env:            map[string]string{},
+				MarkdownServer: &config.MarkdownServerConfig{Enabled: true, Port: 4040},
+			},
+			wantContains: []string{
+				"npm install -g marked@latest",
+				"RIG_MD_PORT=4040",
+			},
+		},
+		{
+			name: "markdown server explicitly disabled",
+			config: &config.Config{
+				Languages:      map[string]config.LanguageConfig{},
+				Env:            map[string]string{},
+				MarkdownServer: &config.MarkdownServerConfig{Enabled: false},
+			},
+			wantNotContain: []string{
+				"npm install -g marked",
+				"ENV RIG_MD_PORT",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buildCtx, err := Generate(tt.config)
+			require.NoError(t, err)
+
+			for _, want := range tt.wantContains {
+				assert.Contains(t, buildCtx.Dockerfile, want, "expected Dockerfile to contain: %s", want)
+			}
+
+			for _, notWant := range tt.wantNotContain {
+				assert.NotContains(t, buildCtx.Dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
 			}
 		})
 	}
@@ -239,16 +300,16 @@ func TestGenerateWithJavaIncludesSDKMAN(t *testing.T) {
 		Env: map[string]string{},
 	}
 
-	dockerfile, err := Generate(cfg)
+	buildCtx, err := Generate(cfg)
 	require.NoError(t, err)
 
 	// Should include SDKMAN installation
-	assert.Contains(t, dockerfile, "get.sdkman.io")
-	assert.Contains(t, dockerfile, "sdkman-init.sh")
+	assert.Contains(t, buildCtx.Dockerfile, "get.sdkman.io")
+	assert.Contains(t, buildCtx.Dockerfile, "sdkman-init.sh")
 
 	// Should install Java and Maven via SDKMAN
-	assert.Contains(t, dockerfile, "sdk install java")
-	assert.Contains(t, dockerfile, "sdk install maven")
+	assert.Contains(t, buildCtx.Dockerfile, "sdk install java")
+	assert.Contains(t, buildCtx.Dockerfile, "sdk install maven")
 }
 
 func TestGenerateWithShellConfiguration(t *testing.T) {
@@ -345,15 +406,15 @@ func TestGenerateWithShellConfiguration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dockerfile, err := Generate(tt.config)
+			buildCtx, err := Generate(tt.config)
 			require.NoError(t, err)
 
 			for _, want := range tt.wantContains {
-				assert.Contains(t, dockerfile, want, "expected Dockerfile to contain: %s", want)
+				assert.Contains(t, buildCtx.Dockerfile, want, "expected Dockerfile to contain: %s", want)
 			}
 
 			for _, notWant := range tt.wantNotContain {
-				assert.NotContains(t, dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
+				assert.NotContains(t, buildCtx.Dockerfile, notWant, "expected Dockerfile NOT to contain: %s", notWant)
 			}
 		})
 	}

@@ -27,10 +27,10 @@ func (c *Client) ImageExists(ctx context.Context, imageRef string) (bool, error)
 	return true, nil
 }
 
-// BuildImage builds a Docker image from a Dockerfile string
-func (c *Client) BuildImage(ctx context.Context, dockerfile string, imageRef string) error {
-	// Create tar archive with Dockerfile in memory
-	tarBuf, err := createDockerfileTar(dockerfile)
+// BuildImage builds a Docker image from a Dockerfile string and optional extra files
+func (c *Client) BuildImage(ctx context.Context, dockerfile string, imageRef string, extraFiles map[string][]byte) error {
+	// Create tar archive with Dockerfile and extra files in memory
+	tarBuf, err := createDockerfileTar(dockerfile, extraFiles)
 	if err != nil {
 		return fmt.Errorf("creating build context: %w", err)
 	}
@@ -55,8 +55,8 @@ func (c *Client) BuildImage(ctx context.Context, dockerfile string, imageRef str
 	return nil
 }
 
-// createDockerfileTar creates an in-memory tar archive containing the Dockerfile
-func createDockerfileTar(dockerfile string) (io.Reader, error) {
+// createDockerfileTar creates an in-memory tar archive containing the Dockerfile and extra files
+func createDockerfileTar(dockerfile string, extraFiles map[string][]byte) (io.Reader, error) {
 	var buf bytes.Buffer
 	tw := tar.NewWriter(&buf)
 
@@ -72,6 +72,21 @@ func createDockerfileTar(dockerfile string) (io.Reader, error) {
 	if _, err := tw.Write([]byte(dockerfile)); err != nil {
 		return nil, fmt.Errorf("writing dockerfile to tar: %w", err)
 	}
+
+	for name, content := range extraFiles {
+		h := &tar.Header{
+			Name: name,
+			Mode: 0644,
+			Size: int64(len(content)),
+		}
+		if err := tw.WriteHeader(h); err != nil {
+			return nil, fmt.Errorf("writing tar header for %s: %w", name, err)
+		}
+		if _, err := tw.Write(content); err != nil {
+			return nil, fmt.Errorf("writing %s to tar: %w", name, err)
+		}
+	}
+
 	if err := tw.Close(); err != nil {
 		return nil, fmt.Errorf("closing tar writer: %w", err)
 	}

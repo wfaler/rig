@@ -20,11 +20,19 @@ type TemplateData struct {
 	CodeServerPort       int
 	CodeServerTheme      string
 	CodeServerExtensions []string
+	MarkdownServer       bool
+	MarkdownServerPort   int
 	Shell                string
 }
 
+// BuildContext holds the Dockerfile and any extra files needed in the build context
+type BuildContext struct {
+	Dockerfile string
+	ExtraFiles map[string][]byte // filename -> content
+}
+
 // Generate creates a Dockerfile string from the config
-func Generate(cfg *config.Config) (string, error) {
+func Generate(cfg *config.Config) (*BuildContext, error) {
 	// Build language installation commands
 	var langInstalls []string
 	for lang, langCfg := range cfg.Languages {
@@ -59,18 +67,29 @@ func Generate(cfg *config.Config) (string, error) {
 		CodeServerPort:       cfg.GetCodeServerPort(),
 		CodeServerTheme:      cfg.GetCodeServerTheme(),
 		CodeServerExtensions: extensions,
+		MarkdownServer:       cfg.IsMarkdownServerEnabled(),
+		MarkdownServerPort:   cfg.GetMarkdownServerPort(),
 		Shell:                cfg.GetShell(),
 	}
 
 	tmpl, err := template.New("dockerfile").Parse(BaseTemplate)
 	if err != nil {
-		return "", fmt.Errorf("parsing template: %w", err)
+		return nil, fmt.Errorf("parsing template: %w", err)
 	}
 
 	var buf bytes.Buffer
 	if err := tmpl.Execute(&buf, data); err != nil {
-		return "", fmt.Errorf("executing template: %w", err)
+		return nil, fmt.Errorf("executing template: %w", err)
 	}
 
-	return buf.String(), nil
+	ctx := &BuildContext{
+		Dockerfile: buf.String(),
+		ExtraFiles: make(map[string][]byte),
+	}
+
+	if cfg.IsMarkdownServerEnabled() {
+		ctx.ExtraFiles["rig-md-server.js"] = []byte(MarkdownServerScript)
+	}
+
+	return ctx, nil
 }
