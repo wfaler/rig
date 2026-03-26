@@ -138,6 +138,25 @@ code_server:
 | **Rust** | latest, specific (e.g., "1.75") | cargo |
 | **Ruby** | latest, specific (e.g., "3.3") | bundler, gem |
 
+### Accessing Host Services
+
+Rig containers can connect to services running on your host machine (databases, APIs, etc.) using the hostname `host.docker.internal`. This works on all platforms (macOS, Windows, and Linux).
+
+For example, if you have PostgreSQL running on your host on port 5432:
+
+```bash
+# Inside the rig container
+psql -h host.docker.internal -p 5432 -U myuser mydb
+```
+
+Or from application code:
+
+```
+DATABASE_URL=postgresql://myuser:pass@host.docker.internal:5432/mydb
+```
+
+No additional configuration is needed — `host.docker.internal` is available in every rig container by default.
+
 ### Code Server (VS Code in Browser)
 
 Enable `code_server` to get a full VS Code experience in your browser:
