@@ -88,7 +88,7 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 	}
 
 	if cfg.IsMarkdownServerEnabled() {
-		ctx.ExtraFiles["rig-md-server.js"] = []byte(MarkdownServerScript)
+		ctx.ExtraFiles["rig-md-server.js"] = []byte(GetMarkdownServerScript())
 	}
 
 	return ctx, nil

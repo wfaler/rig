@@ -22,18 +22,22 @@ The rig markdown server renders `.md` files from `/workspace` in the browser. Us
 
 ## Decision
 
-### Split server into multiple files
+### Split server into multiple files, embedded via `go:embed`
 
-The current server is ~400 lines in a single Go string constant. Adding search, vector indexing, and MCP would push this past 1500 lines. Instead, split into multiple JS files, each as its own Go constant in a dedicated file:
+The current server is ~400 lines in a single Go string constant. Adding search, vector indexing, and MCP would push this past 1500 lines. Instead, all JS/CSS lives as standalone files under `internal/dockerfile/scripts/`, embedded into the Go binary at compile time via `//go:embed`:
 
-| Go File | Go Constant | Installed As | Purpose |
-|---|---|---|---|
-| `template.go` (existing) | `MarkdownServerScript` | `rig-md-server.js` | HTTP server, rendering, SSE, search routes |
-| `search_scripts.go` (new) | `SearchIndexScript` | `rig-search-index.js` | Text search index (filename + full-text) |
-| `search_scripts.go` | `VectorSearchScript` | `rig-vector-search.js` | Semantic search with local embeddings |
-| `search_scripts.go` | `McpServerScript` | `rig-mcp-server.js` | MCP server (JSON-RPC over stdio) |
+| Source File | Installed As | Purpose |
+|---|---|---|
+| `scripts/rig-md-server.js` | `/usr/local/bin/rig-md-server.js` | HTTP server, rendering, SSE, search routes |
+| `scripts/rig-md-client.js` | Inlined in HTML `<script>` | Browser JS (theme, nav, mermaid, live-reload, search UI) |
+| `scripts/rig-md-styles.css` | Inlined in HTML `<style>` | All CSS (themes, layout, nav, search) |
+| `scripts/rig-search-index.js` | `/usr/local/bin/rig-search-index.js` | Text search index (filename + full-text) |
+| `scripts/rig-vector-search.js` | `/usr/local/bin/rig-vector-search.js` | Semantic search with local embeddings |
+| `scripts/rig-mcp-server.js` | `/usr/local/bin/rig-mcp-server.js` | MCP server (JSON-RPC over stdio) |
 
-All files are added to the Docker build context via the existing `BuildContext.ExtraFiles` map and `COPY`'d into the image.
+Files installed to `/usr/local/bin/` are added to the Docker build context via `BuildContext.ExtraFiles` and `COPY`'d into the image. CSS and client JS are injected into the HTML by the server at render time.
+
+This eliminates the multi-layer escaping issues (Go raw string → JS template literal → CSS/regex) that have caused repeated bugs, and gives proper editor support (syntax highlighting, linting) for all embedded code.
 
 ### Text search: MiniSearch (proper full-text search)
 
@@ -106,6 +110,27 @@ AI assistants configure it as:
 ```
 
 The MCP server implements JSON-RPC directly (~200 lines) to avoid adding `@modelcontextprotocol/sdk` as a dependency.
+
+### Why MCP search matters (and why grep isn't enough)
+
+AI agents like Claude Code have excellent built-in tools (grep, glob, read) and are deeply trained to use them. An MCP search tool will **not** automatically replace grep — Claude will default to what it knows. The MCP search adds value in two specific ways:
+
+**1. Semantic search can't be done with grep.** A query like "how does the build pipeline handle caching?" requires understanding concepts, not matching strings. This is the primary reason to expose search via MCP — it gives AI agents a capability they simply don't have with their built-in tools.
+
+**2. Token efficiency for broad queries.** When an AI agent greps for a common term across a large codebase, it gets back raw file contents from every match — potentially thousands of lines dumped into context. The MCP search returns ranked results with snippets (top 10, ~50 tokens each vs. potentially thousands of raw lines). For discovery-oriented queries, this is dramatically more token-efficient.
+
+**Making agents actually use it:** `.mcp.json` makes the tool *available*, but agents need guidance to *prefer* it. `rig init` should generate a `CLAUDE.md` (and equivalent for other agents) with instructions like:
+
+```markdown
+## Search
+
+This project has a rig-docs MCP search server available. Use the `search` tool
+for finding relevant documentation before grepping — it supports semantic search
+and returns ranked results with snippets, using fewer tokens than grep for
+broad queries. Use grep for exact string/symbol lookups.
+```
+
+This ensures agents reach for MCP search when it's the right tool (discovery, broad queries, "how does X work?") while still using grep for precise lookups ("find all calls to `processPayment`").
 
 ### Search API
 
@@ -180,32 +205,106 @@ RUN node -e "..." # pre-download model
 COPY rig-vector-search.js /usr/local/bin/rig-vector-search.js
 ```
 
-### MCP auto-configuration
+### MCP auto-configuration and agent guidance
 
-When `rig init` creates a new project, it should also generate MCP configuration files so AI assistants discover the search server automatically:
+When `rig init` creates a new project, it generates two things:
 
-- **Claude**: write `.mcp.json` (project-level MCP config) with the rig-docs server entry
-- **Other agents**: follow their respective MCP config conventions as they emerge
+**1. `.mcp.json`** — MCP tool discovery for AI assistants:
+```json
+{
+  "mcpServers": {
+    "rig-docs": {
+      "command": "node",
+      "args": ["/usr/local/bin/rig-mcp-server.js"]
+    }
+  }
+}
+```
 
-This means the MCP server is usable out of the box — no manual config step for the user. The generated config points to `node /usr/local/bin/rig-mcp-server.js` which is available inside the container where the AI agents run.
+**2. `CLAUDE.md`** (and equivalents for other agents) — behavioural guidance so agents actually use the search tool when appropriate:
+```markdown
+## Search
+
+This project has a rig-docs MCP search server available. Use the `search` tool
+for finding relevant documentation before grepping — it supports semantic search
+and returns ranked results with snippets, using fewer tokens than grep for
+broad queries. Use grep for exact string/symbol lookups.
+```
+
+Both files are generated into the project directory. `.mcp.json` makes the tool available; `CLAUDE.md` makes the agent prefer it for the right queries. Without the guidance file, agents will ignore the MCP tool in favour of their built-in grep/read tools.
+
+If these files already exist, `rig init` should merge the MCP server entry into the existing `.mcp.json` and append the search section to `CLAUDE.md` rather than overwriting.
 
 ## Implementation Phases
 
+### Phase 0: Externalise embedded JS from Go strings
+
+The current approach of embedding JS/CSS as Go string constants (backtick-delimited raw strings) has caused repeated issues:
+- Multi-layer escaping bugs (Go raw string → JS template literal → CSS/regex)
+- No syntax highlighting, linting, or editor support for the embedded code
+- Difficult to read and maintain at scale
+
+**Solution: Use Go's built-in `embed` package** (available since Go 1.16, no external dependency).
+
+Move all JS/CSS into standalone files under `internal/dockerfile/scripts/`:
+
+```
+internal/dockerfile/scripts/
+├── rig-md-server.js       # Main HTTP server, rendering, SSE
+├── rig-md-client.js       # Browser-side JS (theme toggle, nav, mermaid, live-reload)
+├── rig-md-styles.css      # All CSS (light/dark themes, layout, nav)
+```
+
+Embed them in Go:
+
+```go
+package dockerfile
+
+import "embed"
+
+//go:embed scripts/rig-md-server.js
+var MarkdownServerScript string
+
+//go:embed scripts/rig-md-client.js
+var MarkdownClientJS string
+
+//go:embed scripts/rig-md-styles.css
+var MarkdownCSS string
+```
+
+The server script then references the CSS and client JS as separate embedded strings rather than concatenating them inline. The `renderPage` function injects them via `<style>` and `<script>` tags as before, but the source of truth is now proper `.js` and `.css` files.
+
+**Benefits:**
+- Proper syntax highlighting and linting in editors
+- No escaping issues — the files are exactly what gets embedded
+- Testable independently (can run the JS through Node, validate CSS)
+- Natural place for search scripts to live in later phases
+
+**Migration steps:**
+1. Create `internal/dockerfile/scripts/` directory
+2. Extract `MarkdownServerScript` into `scripts/rig-md-server.js`
+3. Extract `CSS` and `CLIENT_JS` into `scripts/rig-md-styles.css` and `scripts/rig-md-client.js`
+4. Update `template.go` to use `//go:embed` and reference the embedded vars
+5. Update `generator.go` to pass CSS/JS strings to the server script (via template substitution or as separate ExtraFiles)
+6. Verify all tests pass — behaviour should be identical
+
 ### Phase 1: Text search
-1. Create `search_scripts.go` with `SearchIndexScript` (using MiniSearch)
+1. Add `scripts/rig-search-index.js` (using MiniSearch)
 2. Add `minisearch` to npm install in Dockerfile template
 3. Add search API routes to main server
 4. Add search UI (CSS + JS)
 5. Wire into `generator.go` ExtraFiles and Dockerfile template
 6. Config + tests
 
-### Phase 2: MCP server + auto-config
-1. Add `McpServerScript` to `search_scripts.go`
+### Phase 2: MCP server + auto-config + agent guidance
+1. Add `scripts/rig-mcp-server.js`
 2. Include in ExtraFiles and Dockerfile
 3. Update `rig init` to generate `.mcp.json` with rig-docs server entry
+4. Update `rig init` to generate `CLAUDE.md` with search guidance (append if exists)
+5. Consider equivalent guidance files for other agents (Gemini, Codex) as their conventions stabilize
 
 ### Phase 3: Vector search (optional, config-gated)
-1. Add `VectorSearchScript` to `search_scripts.go`
+1. Add `scripts/rig-vector-search.js`
 2. Conditional npm install + model download in Dockerfile template
 3. Add `SearchConfig.Semantic` to config
 4. Wire into combined search API (RRF merging) and MCP server
@@ -221,7 +320,7 @@ This means the MCP server is usable out of the box — no manual config step for
 | MiniSearch (not SQLite FTS / Elasticsearch) | Proper TF-IDF ranking, fuzzy matching, prefix search, pure JS, ~10KB | RAM scales with corpus | <50MB for thousands of files; can switch to `better-sqlite3` + FTS5 later if needed |
 | Local embedding model (not API) | Works offline, no API keys, no cost | ~100MB image size increase | Off by default, config-gated |
 | Separate MCP process | Clean stdio transport, no stdout conflicts | Extra process | Lightweight; communicates via localhost HTTP |
-| Multiple Go string constants | Each file self-contained, testable | More constants to manage | Separate `.go` file; clear naming |
+| `go:embed` with standalone files | Proper editor support, no escaping bugs, lintable | Slightly more files in the repo | Files are self-contained and independently testable |
 | Raw JSON-RPC (not MCP SDK) | No dependency | Must maintain protocol compliance | MCP protocol is simple; ~200 lines |
 | Vanilla JS (not TypeScript) | No build step | No type safety | Scripts are small and self-contained |
 
@@ -229,6 +328,7 @@ This means the MCP server is usable out of the box — no manual config step for
 
 - Text search (Phase 1) adds `minisearch` (~10KB) — proper full-text search with TF-IDF ranking, fuzzy matching, and prefix search
 - MCP server (Phase 2) makes workspace docs searchable by AI assistants out of the box; `.mcp.json` is auto-generated by `rig init`
+- `CLAUDE.md` guidance (Phase 2) is critical — without it, AI agents will ignore the MCP tool and default to grep. The guidance steers agents toward MCP search for discovery/broad queries while preserving grep for exact lookups
 - When semantic search is enabled, text and vector results are merged via RRF into a single ranked list — one search, best of both worlds
 - Vector search (Phase 3) is opt-in; users who enable it accept the ~100MB image size trade-off
 - The multi-file split keeps each script manageable and independently testable
