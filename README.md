@@ -2,27 +2,40 @@
 
 **Instant, reproducible development environments for AI-assisted coding.**
 
-Rig creates isolated Docker containers pre-configured with your language runtimes, build tools, AI coding assistants and optionally code-server (VS Code in the browser). One command to enter a fully-equipped sandbox—no manual setup, no "works on my machine" issues.
+Rig creates isolated Docker containers pre-configured with your language runtimes, build tools, and AI coding assistants. One command to enter a fully-equipped sandbox — no manual setup, no "works on my machine" issues.
 
-### Installing
+## Installing
+
 Mac:
 ```
 brew tap wfaler/tap
 brew install wfaler/tap/rig
 ```
+
 Other platforms:
-* Have Go installed
-* Run `make build`
-* Move `rig` binary to somewhere on your path.
+- Have Go installed
+- Run `make build`
+- Move the `rig` binary to somewhere on your path
+
+## Quick Start
+
+```bash
+cd your-project
+rig init        # Creates .rig.yml
+rig up          # Build and enter the container
+```
+
+That's it. You're in a container with your languages, tools, and AI assistants ready to go.
 
 ## Why Rig?
 
 - **Zero Setup** — Define your stack in YAML, run `rig up`, and you're coding
-- **AI Agents Ready** — Claude Code, Gemini CLI, OpenAI Codex and GitHub CLI pre-installed
+- **AI Agents Ready** — Claude Code, Gemini CLI, OpenAI CLI and GitHub CLI pre-installed
+- **Documentation Server** — Built-in markdown renderer with live-reload, mermaid diagrams, and dark/light themes
 - **VS Code in Browser** — Optional code-server with language extensions, auto-configured
-- **Testcontainers Support** — Docker-in-Docker works out of the box (**without** needing privileged mode)
+- **Testcontainers Support** — Docker-in-Docker works out of the box (**without** privileged mode)
 - **Persistent Sessions** — Your container persists between sessions; instant startup after first build
-- **Auto-Rebuild** — Change your config, and the image rebuilds automatically next time you enter.
+- **Auto-Rebuild** — Change your config, and the image rebuilds automatically next time you enter
 
 ## Why Rig and not Dev Containers?
 
@@ -39,13 +52,13 @@ VS Code Dev Containers are powerful, but they come with trade-offs that Rig avoi
 
 ### One container, all branches
 
-Dev Containers are often tied to your Git branch or workspace state. Switch branches and you might trigger a rebuild—or worse, lose your installed dependencies and cached builds.
+Dev Containers are often tied to your Git branch or workspace state. Switch branches and you might trigger a rebuild — or worse, lose your installed dependencies and cached builds.
 
-Rig containers are **project-scoped, not branch-scoped**. The container persists based on your `.rig.yml` config hash, not which branch you're on. Switch from `main` to `feature-x` to `hotfix-123`—you're still in the same warm container with all your tools ready. Rebuilds only happen when your environment config actually changes.
+Rig containers are **project-scoped, not branch-scoped**. The container persists based on your `.rig.yml` config hash, not which branch you're on. Switch from `main` to `feature-x` to `hotfix-123` — you're still in the same warm container with all your tools ready. Rebuilds only happen when your environment config actually changes.
 
-### Rig is opinionated so you don't have to be
+### Opinionated so you don't have to be
 
-Dev Containers give you maximum flexibility—and maximum decisions. Rig makes sensible choices:
+Dev Containers give you maximum flexibility — and maximum decisions. Rig makes sensible choices:
 
 - **One version manager**: Mise for most languages, SDKMAN for JVM
 - **One shell**: Zsh with Oh My Zsh (or bash/fish if you prefer)
@@ -54,39 +67,20 @@ Dev Containers give you maximum flexibility—and maximum decisions. Rig makes s
 
 ### Terminal-native, IDE-optional
 
-Rig is built for developers who live in the terminal. Run `rig up` and you're in a shell with everything ready. Want VS Code? Enable `code_server` and open it in your browser—on any machine, any OS.
+Rig is built for developers who live in the terminal. Run `rig up` and you're in a shell with everything ready. Want VS Code? Enable `code_server` and open it in your browser — on any machine, any OS.
 
 Dev Containers assume you're opening your project in VS Code. Rig assumes you might be SSHing from an iPad, pairing over tmux, or running Claude Code headless on a CI server.
 
-### No JSON, no features matrix, no debugging
+## Commands
 
-With Dev Containers, you're composing features, debugging `postCreateCommand` failures, and wondering why your Docker socket isn't mounted correctly.
-
-With Rig:
-```yaml
-languages:
-  node:
-    version: "lts"
-shell: zsh
-```
-
-That's a complete config. Testcontainers work. Docker works. AI assistants work.
-
-## Quick Start
-
-```bash
-# Install
-go install github.com/wfaler/rig@latest
-
-# Initialize a project
-cd your-project
-rig init
-
-# Edit .rig.yml to your needs, then:
-rig up
-```
-
-That's it. You're in a container with your languages, tools, and AI assistants ready to go.
+| Command | Description |
+|---------|-------------|
+| `rig up` | Enter the container (builds if needed) |
+| `rig down [name]` | Stop the container (preserves state) |
+| `rig destroy [name]` | Stop container and remove all images |
+| `rig list` | List running rig containers |
+| `rig init` | Create `.rig.yml` template |
+| `rig rebuild` | Force clean rebuild of image |
 
 ## Configuration
 
@@ -109,7 +103,6 @@ languages:
     build_systems:
       gradle: "8.5"
       maven: true
-      sbt: "1.9.8"
 
 ports:
   - "3000"
@@ -119,6 +112,9 @@ env:
   API_KEY: "${API_KEY}"  # Expands from host environment
 
 shell: zsh  # zsh with oh-my-zsh (default), bash, or fish
+
+markdown_server:
+  port: 3030             # enabled by default
 
 code_server:
   enabled: true
@@ -140,24 +136,36 @@ code_server:
 
 ### Accessing Host Services
 
-Rig containers can connect to services running on your host machine (databases, APIs, etc.) using the hostname `host.docker.internal`. This works on all platforms (macOS, Windows, and Linux).
-
-For example, if you have PostgreSQL running on your host on port 5432:
+Rig containers can connect to services running on your host machine (databases, APIs, etc.) using the hostname `host.docker.internal`. This works on all platforms.
 
 ```bash
 # Inside the rig container
 psql -h host.docker.internal -p 5432 -U myuser mydb
 ```
 
-Or from application code:
+No additional configuration needed — `host.docker.internal` is available in every rig container by default.
 
+## Documentation Server
+
+Every rig container includes a built-in markdown server that renders your project's `.md` files as navigable HTML. Access it at `http://localhost:3030`.
+
+- **Live-reload** — Edit markdown in your editor, see changes instantly in the browser
+- **File navigation** — Collapsible directory tree sidebar
+- **Mermaid diagrams** — Fenced `mermaid` code blocks render as diagrams
+- **Light/dark theme** — Toggle with persistent preference
+- **Zero config** — Enabled by default, just open the URL
+
+```yaml
+# Optional: change the port
+markdown_server:
+  port: 4040
+
+# Or disable it
+markdown_server:
+  enabled: false
 ```
-DATABASE_URL=postgresql://myuser:pass@host.docker.internal:5432/mydb
-```
 
-No additional configuration is needed — `host.docker.internal` is available in every rig container by default.
-
-### Code Server (VS Code in Browser)
+## Code Server (VS Code in Browser)
 
 Enable `code_server` to get a full VS Code experience in your browser:
 
@@ -166,33 +174,24 @@ code_server:
   enabled: true
   port: 8080                    # default, auto-exposed
   theme: "Default Dark Modern"  # any VS Code theme
-  extensions:                   # extensions to install
+  extensions:
     - golang.go                 # Go
     - ms-python.python          # Python
     - github.copilot            # AI assistant
 ```
 
-Run `rig init` to see all recommended extensions for each language.
-
-## Commands
-
-| Command | Description |
-|---------|-------------|
-| `rig up` | Enter the container (builds if needed) |
-| `rig down [name]` | Stop the container (preserves state) |
-| `rig destroy [name]` | Stop container and remove all images |
-| `rig list` | List running rig containers |
-| `rig init` | Create `.rig.yml` template |
-| `rig rebuild` | Force clean rebuild of image |
+Run `rig init` to see recommended extensions for each language.
 
 ## What's Inside
 
 Every rig container includes:
 
-- **AI Assistants**: Claude Code, Gemini CLI, GitHub CLI
-- **Dev Tools**: git, curl, wget, jq, vim, build-essential
+- **AI Assistants**: Claude Code, Gemini CLI, OpenAI CLI, GitHub CLI
+- **Documentation Server**: Live-reload markdown renderer with mermaid support
+- **Dev Tools**: git, curl, wget, jq, vim, tmux, build-essential
 - **Docker CLI**: For testcontainers and Docker workflows
 - **Version Managers**: Mise (polyglot) and SDKMAN (JVM)
+- **Shell**: Zsh with Oh My Zsh (default), bash, or fish
 
 ## How It Works
 
@@ -224,23 +223,9 @@ Rig does **not** run containers in privileged mode. Instead, it mounts the host'
 
 This is safer than true Docker-in-Docker (which requires `--privileged`), while still enabling full Docker workflows inside your development environment.
 
-It is still possible for malicious code to escape, but it is with extra steps: your rig environment would have to spin up _another_ docker image with privileged mode to escape, then proceed to use that to escape. It's possible, but with extra steps.
-At some point, you have to ask yourself, how paranoid are you? Is this better than YOLO'ing Claude or Codex on your host machine without any barriers?
+For maximum isolation (working with untrusted code), run rig inside a VM — just install Docker in the VM and run rig as normal.
 
-IF you actually are paranoid (working with unknown/untrusted code), you could also run rig inside a VM quite easily: just create a VM, install docker on it, run rig.
-
----
-
-## Development
-
-### Prerequisites
-
-- Go 1.22+
-- Docker
-
-Go is only required to build.
-
-### Build from Source
+## Building from Source
 
 ```bash
 git clone https://github.com/wfaler/rig.git
@@ -248,47 +233,7 @@ cd rig
 make build
 ```
 
-### Common Tasks
-
-```bash
-make build      # Build binary
-make test       # Run tests
-make test-v     # Verbose tests
-make fmt        # Format code
-make clean      # Clean artifacts
-make install    # Install to $GOPATH/bin
-```
-
-### Project Structure
-
-```
-rig/
-├── main.go                 # Entry point
-├── cmd/                    # CLI commands (Cobra)
-│   ├── root.go             # Root command (shows help)
-│   ├── up.go               # rig up
-│   ├── down.go             # rig down
-│   ├── destroy.go          # rig destroy
-│   ├── list.go             # rig list
-│   ├── init.go             # rig init
-│   ├── rebuild.go          # rig rebuild
-│   └── session.go          # Container session logic
-├── internal/
-│   ├── config/             # YAML parsing & validation
-│   ├── docker/             # Docker SDK wrapper
-│   ├── dockerfile/         # Dockerfile generation
-│   └── project/            # Project utilities
-├── REQUIREMENTS.md         # Technical specification
-└── Makefile
-```
-
-### Contributing
-
-1. Add languages: `internal/config/config.go` + `internal/dockerfile/languages.go`
-2. Add VS Code extensions: `internal/dockerfile/languages.go`
-3. Modify container setup: `internal/dockerfile/template.go`
-
-See [REQUIREMENTS.md](REQUIREMENTS.md) for the full technical specification.
+Requires Go 1.22+ and Docker.
 
 ## License
 

@@ -1,3 +1,15 @@
+---
+title: "Search and MCP Server for Rig Markdown Server"
+type: adr
+id: "0001"
+status: Proposed
+superseded_by: ""
+prd: "rig-core"
+created: 2025-01-01
+updated: 2026-03-27
+tickets: []
+---
+
 # ADR-0001: Search and MCP Server for Rig Markdown Server
 
 ## Status

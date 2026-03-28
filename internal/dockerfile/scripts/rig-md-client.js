@@ -36,22 +36,28 @@
     var cur = decodeURIComponent(window.location.pathname);
     var links = nav.querySelectorAll('a');
     for (var i = 0; i < links.length; i++) {
-      if (links[i].getAttribute('href') === cur) {
+      var linkHref = decodeURIComponent(links[i].getAttribute('href'));
+      if (linkHref === cur) {
         links[i].classList.add('active');
-        // Expand parent directories
-        var p = links[i].parentElement;
-        while (p && p !== nav) { if (p.classList && p.classList.contains('dir')) p.classList.remove('collapsed'); p = p.parentElement; }
       }
     }
-    // Directory collapse/expand
+    // Directory collapse/expand click handlers
     var dirs = nav.querySelectorAll('li.dir > span');
     for (var d = 0; d < dirs.length; d++) {
       dirs[d].addEventListener('click', (function(el) { return function() { el.parentElement.classList.toggle('collapsed'); }; })(dirs[d]));
     }
-    // Start directories collapsed (except those with active page)
+    // Collapse all directories, then expand ancestors of active page
     var allDirs = nav.querySelectorAll('li.dir');
     for (var dd = 0; dd < allDirs.length; dd++) {
-      if (!allDirs[dd].querySelector('a.active')) allDirs[dd].classList.add('collapsed');
+      allDirs[dd].classList.add('collapsed');
+    }
+    var activeLink = nav.querySelector('a.active');
+    if (activeLink) {
+      var p = activeLink.parentElement;
+      while (p && p !== nav) {
+        if (p.classList && p.classList.contains('dir')) p.classList.remove('collapsed');
+        p = p.parentElement;
+      }
     }
   }
 
@@ -65,6 +71,7 @@
     es.onopen = function() { badge.className = 'reload-badge'; badge.textContent = 'live'; };
     es.onmessage = function(e) {
       var data = JSON.parse(e.data);
+      if (!data.file) return; // Ignore connection status messages
       var current = decodeURIComponent(window.location.pathname.slice(1));
       if (data.file === current || window.location.pathname === '/') {
         window.location.reload();
