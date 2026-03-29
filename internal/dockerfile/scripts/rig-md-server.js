@@ -13,23 +13,80 @@ const CLIENT_JS = RIG_INJECTED_CLIENT_JS;
 // Track SSE clients for hot-reload
 const clients = new Set();
 
-// Watch for file changes recursively
+// Parse .gitignore to derive ignored directory names
+function loadIgnoredDirs(root) {
+  var ignored = new Set(['node_modules']);
+  try {
+    var lines = fs.readFileSync(path.join(root, '.gitignore'), 'utf8').split('\n');
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line || line.startsWith('#')) continue;
+      // Strip trailing slash if present
+      var name = line.replace(/\/+$/, '');
+      // Skip patterns with path separators (nested paths) or globs — we only match simple directory names
+      if (name.includes('/') || name.includes('*')) continue;
+      ignored.add(name);
+    }
+  } catch (e) {
+    // No .gitignore — just use defaults
+  }
+  return ignored;
+}
+
+var ignoredDirs = loadIgnoredDirs(ROOT);
+
+function isIgnoredDir(name) {
+  return name.startsWith('.') || ignoredDirs.has(name);
+}
+
+// Notify SSE clients of a markdown file change
+function notifyChange(eventType, filename) {
+  fileListDirty = true;
+  var payload = JSON.stringify({ file: filename, event: eventType });
+  for (var res of clients) {
+    res.write('data: ' + payload + '\n\n');
+  }
+}
+
+// Watch a single directory (non-recursive) and set up watchers on subdirectories
 function watchDir(dir) {
   try {
-    var watcher = fs.watch(dir, { recursive: true }, (eventType, filename) => {
-      if (filename && filename.endsWith('.md')) {
-        fileListDirty = true;
-        const payload = JSON.stringify({ file: filename, event: eventType });
-        for (const res of clients) {
-          res.write('data: ' + payload + '\n\n');
+    var watcher = fs.watch(dir, function(eventType, filename) {
+      if (!filename) return;
+      var fullPath = path.join(dir, filename);
+      if (filename.endsWith('.md')) {
+        var rel = path.relative(ROOT, fullPath);
+        notifyChange(eventType, rel);
+      }
+      // If a new directory appears, watch it too
+      try {
+        if (fs.statSync(fullPath).isDirectory() && !isIgnoredDir(filename)) {
+          watchDirRecursive(fullPath);
         }
+      } catch (e) {
+        // Directory may have already been removed — ignore
       }
     });
-    watcher.on('error', (e) => {
+    watcher.on('error', function(e) {
       console.error('Watch error:', e.message);
     });
   } catch (e) {
     console.error('Watch setup error:', e.message);
+  }
+}
+
+// Recursively watch a directory tree, skipping ignored directories
+function watchDirRecursive(dir) {
+  watchDir(dir);
+  try {
+    var entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (var i = 0; i < entries.length; i++) {
+      if (entries[i].isDirectory() && !isIgnoredDir(entries[i].name)) {
+        watchDirRecursive(path.join(dir, entries[i].name));
+      }
+    }
+  } catch (e) {
+    // Directory may have been removed between readdir and watch — ignore
   }
 }
 
@@ -41,7 +98,7 @@ function findMarkdownFiles(dir, base) {
     for (var i = 0; i < entries.length; i++) {
       var entry = entries[i];
       var rel = base ? base + '/' + entry.name : entry.name;
-      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+      if (isIgnoredDir(entry.name)) continue;
       if (entry.isDirectory()) {
         results = results.concat(findMarkdownFiles(path.join(dir, entry.name), rel));
       } else if (entry.name.endsWith('.md')) {
@@ -201,7 +258,7 @@ var server = http.createServer(function(req, res) {
   });
 });
 
-watchDir(ROOT);
+watchDirRecursive(ROOT);
 server.listen(PORT, '0.0.0.0', function() {
   console.log('Rig markdown server listening on http://0.0.0.0:' + PORT);
   console.log('Serving markdown from: ' + ROOT);
