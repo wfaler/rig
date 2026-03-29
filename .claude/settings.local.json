@@ -18,7 +18,8 @@
       "Bash(make lint:*)",
       "Bash(go install:*)",
       "Bash(go doc:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Bash(docker ps:*)"
     ]
   }
 }

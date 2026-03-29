@@ -16,7 +16,7 @@ const clients = new Set();
 // Watch for file changes recursively
 function watchDir(dir) {
   try {
-    fs.watch(dir, { recursive: true }, (eventType, filename) => {
+    var watcher = fs.watch(dir, { recursive: true }, (eventType, filename) => {
       if (filename && filename.endsWith('.md')) {
         fileListDirty = true;
         const payload = JSON.stringify({ file: filename, event: eventType });
@@ -25,8 +25,11 @@ function watchDir(dir) {
         }
       }
     });
+    watcher.on('error', (e) => {
+      console.error('Watch error:', e.message);
+    });
   } catch (e) {
-    console.error('Watch error:', e.message);
+    console.error('Watch setup error:', e.message);
   }
 }
 
@@ -109,7 +112,14 @@ function getFiles() {
 }
 
 var server = http.createServer(function(req, res) {
-  var url = decodeURIComponent(req.url.split('?')[0]);
+  var url;
+  try {
+    url = decodeURIComponent(req.url.split('?')[0]);
+  } catch (e) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Bad Request');
+    return;
+  }
 
   // SSE endpoint for hot-reload
   if (url === '/_rig/events') {
@@ -163,7 +173,14 @@ var server = http.createServer(function(req, res) {
       res.end(renderPage('Not Found', '<h1>404</h1><p>File not found: ' + url + '</p><p><a href="/">Back to index</a></p>', files));
       return;
     }
-    var html = marked.parse(content);
+    var html;
+    try {
+      html = marked.parse(content);
+    } catch (parseErr) {
+      res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(renderPage('Error', '<h1>Render Error</h1><p>Failed to parse: ' + relPath + '</p><p><a href="/">Back to index</a></p>', files));
+      return;
+    }
     // Rewrite relative .md links to work as server routes
     html = html.replace(/href="([^"]*?\.md)"/g, function(match, href) {
       if (href.startsWith('http://') || href.startsWith('https://')) return match;

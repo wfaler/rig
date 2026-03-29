@@ -41,6 +41,8 @@ env: {}
 # Default shell: zsh (default, with oh-my-zsh), bash, or fish
 # shell: zsh
 
+markdown_server:
+  port: 3031       
 # VS Code in browser (code-server)
 code_server:
   enabled: false 
