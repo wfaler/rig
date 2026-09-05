@@ -51,6 +51,10 @@ type DockerClient interface {
 	// bind mount for a container, or "" if the container has no such mount.
 	GetHerdrSocketHostPath(ctx context.Context, containerID string) (string, error)
 
+	// GetDockerSocketHostPath returns the host source path bind-mounted at
+	// ContainerDockerSocket for a container, or "" if it has no such mount.
+	GetDockerSocketHostPath(ctx context.Context, containerID string) (string, error)
+
 	// GetContainerEnvValue returns the value of an environment variable baked
 	// into a container's config at create time, or "" if unset.
 	GetContainerEnvValue(ctx context.Context, containerID string, key string) (string, error)
@@ -68,6 +72,12 @@ type ContainerConfig struct {
 	Ports         []string          // Port mappings ("host:container" or "port")
 	Env           map[string]string // Environment variables
 	Command       []string          // Command to run
+
+	// DockerSocketHostPath, when non-empty, is the path of the engine socket
+	// to bind-mount at ContainerDockerSocket for Docker-in-Docker
+	// (testcontainers). Resolve it with HostDockerSocket; an empty value
+	// creates the container without a socket mount.
+	DockerSocketHostPath string
 
 	// HerdrSocketHostPath, when non-empty, is the host path of the herdr
 	// control socket to bind-mount into the container at

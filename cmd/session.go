@@ -121,6 +121,16 @@ func runSession(command []string) error {
 		attachEnv = herdrInfo.ContainerEnv(cfg.GetHerdrAgent())
 	}
 
+	// Resolve the engine socket to bind-mount for Docker-in-Docker. The path
+	// differs between Docker and Podman (and between rootful and rootless),
+	// so it is resolved rather than assumed; an empty result means no usable
+	// socket was found and the container runs without DinD.
+	hostDockerSocket := docker.HostDockerSocket()
+	if hostDockerSocket == "" {
+		fmt.Println("Note: no reachable Docker/Podman socket found - testcontainers and the in-container docker CLI will be unavailable.")
+		fmt.Println("      Set DOCKER_HOST to your engine's socket (e.g. unix://$XDG_RUNTIME_DIR/podman/podman.sock) and recreate the container.")
+	}
+
 	// Always expose the host workdir in the interactive session too, so
 	// containers created by older rig versions pick it up without recreation.
 	if attachEnv == nil {
@@ -157,12 +167,22 @@ func runSession(command []string) error {
 		if err != nil {
 			return fmt.Errorf("inspecting herdr bridge env: %w", err)
 		}
+
+		// The engine socket mount is fixed at create time too, so a container
+		// created against a different socket (e.g. after switching from
+		// Docker to Podman) must be recreated - otherwise it fails to start
+		// on a path the engine can no longer reach.
+		existingDockerSocket, err := dockerClient.GetDockerSocketHostPath(ctx, containerID)
+		if err != nil {
+			return fmt.Errorf("inspecting docker socket mount: %w", err)
+		}
 		desiredProxyPort := ""
 		if herdrProxyPort != 0 {
 			desiredProxyPort = strconv.Itoa(herdrProxyPort)
 		}
 
-		if currentImage == imageRef && existingHerdrSocket == herdrSocket && existingProxyPort == desiredProxyPort {
+		if currentImage == imageRef && existingHerdrSocket == herdrSocket &&
+			existingProxyPort == desiredProxyPort && existingDockerSocket == hostDockerSocket {
 			// Same image and herdr state - reuse container
 			if running {
 				// Already running - just exec into it
@@ -183,7 +203,7 @@ func runSession(command []string) error {
 			return nil
 		}
 
-		// Image or herdr state changed - remove and recreate
+		// Image, herdr state or engine socket changed - remove and recreate
 		fmt.Printf("Config changed, recreating container...\n")
 		if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
 			return fmt.Errorf("removing old container: %w", err)
@@ -193,14 +213,15 @@ func runSession(command []string) error {
 	// Create new container
 	fmt.Printf("Creating container %s...\n", containerName)
 	containerID, err = dockerClient.CreateContainer(ctx, docker.ContainerConfig{
-		ImageRef:            imageRef,
-		ContainerName:       containerName,
-		WorkDir:             cwd,
-		Ports:               cfg.GetAllPorts(),
-		Env:                 cfg.Env,
-		Command:             command,
-		HerdrSocketHostPath: herdrSocket,
-		HerdrProxyPort:      herdrProxyPort,
+		ImageRef:             imageRef,
+		ContainerName:        containerName,
+		WorkDir:              cwd,
+		Ports:                cfg.GetAllPorts(),
+		Env:                  cfg.Env,
+		Command:              command,
+		DockerSocketHostPath: hostDockerSocket,
+		HerdrSocketHostPath:  herdrSocket,
+		HerdrProxyPort:       herdrProxyPort,
 	})
 	if err != nil {
 		return fmt.Errorf("creating container: %w", err)

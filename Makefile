@@ -1,4 +1,4 @@
-.PHONY: build test test-v clean install deps fmt lint coverage help
+.PHONY: build test test-v test-integration clean install deps fmt lint coverage help
 
 # Binary name
 BINARY := rig
@@ -32,6 +32,10 @@ test:
 ## test-v: Run tests with verbose output
 test-v:
 	$(GOTEST) -v ./...
+
+## test-integration: Run integration tests (requires a running Docker or Podman engine)
+test-integration:
+	$(GOTEST) -tags integration -v ./...
 
 ## test-race: Run tests with race detector
 test-race:

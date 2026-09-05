@@ -68,10 +68,15 @@ func (c *Client) CreateContainer(ctx context.Context, cfg ContainerConfig) (stri
 		WorkingDir:   "/workspace",
 	}
 
-	// Base mounts: project directory and Docker socket for DinD (testcontainers).
+	// Base mounts: project directory, plus the engine socket for DinD
+	// (testcontainers) when the caller resolved a usable one. The path varies
+	// by engine — rootless Podman and rootless Docker keep theirs under
+	// $XDG_RUNTIME_DIR — so it is never hardcoded here.
 	binds := []string{
 		fmt.Sprintf("%s:/workspace:rw", cfg.WorkDir),
-		"/var/run/docker.sock:/var/run/docker.sock",
+	}
+	if cfg.DockerSocketHostPath != "" {
+		binds = append(binds, fmt.Sprintf("%s:%s", cfg.DockerSocketHostPath, ContainerDockerSocket))
 	}
 	// When running inside herdr, bind-mount its control socket so the
 	// containerized agent can drive herdr over the socket API.
@@ -170,6 +175,27 @@ func (c *Client) GetHerdrSocketHostPath(ctx context.Context, containerID string)
 		// Binds are "source:destination[:options]".
 		parts := strings.Split(bind, ":")
 		if len(parts) >= 2 && parts[1] == herdr.ContainerSocketPath {
+			return parts[0], nil
+		}
+	}
+	return "", nil
+}
+
+// GetDockerSocketHostPath returns the host source path bind-mounted at
+// ContainerDockerSocket for a container, or "" if the container has no such
+// mount. Used to detect a container created against a different engine socket
+// (e.g. after a Docker to Podman switch), which must be recreated.
+func (c *Client) GetDockerSocketHostPath(ctx context.Context, containerID string) (string, error) {
+	info, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return "", fmt.Errorf("inspecting container: %w", err)
+	}
+	if info.HostConfig == nil {
+		return "", nil
+	}
+	for _, bind := range info.HostConfig.Binds {
+		parts := strings.Split(bind, ":")
+		if len(parts) >= 2 && parts[1] == ContainerDockerSocket {
 			return parts[0], nil
 		}
 	}

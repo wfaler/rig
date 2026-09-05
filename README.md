@@ -252,20 +252,45 @@ graph LR
 1. **Config Hash** — Your `.rig.yml` is hashed to create a unique image tag
 2. **Smart Builds** — Images only rebuild when config changes
 3. **Persistent Containers** — Named `rig-<project>`, reused across sessions
-4. **Socket Mounting** — Docker socket mounted for testcontainers support
+4. **Socket Mounting** — The container engine socket is mounted for testcontainers support
 5. **Entrypoint Magic** — Permissions and services configured at container start
+
+### Docker and Podman
+
+Rig talks to the engine through the Docker API, so both **Docker** and **Podman** work on Linux and macOS. Podman needs its Docker-compatible socket running — with rootless Podman on Linux, that is:
+
+```bash
+systemctl --user enable --now podman.socket
+export DOCKER_HOST=unix://$XDG_RUNTIME_DIR/podman/podman.sock
+```
+
+For Docker-in-Docker (testcontainers), rig bind-mounts the engine socket at `/var/run/docker.sock` inside the container. The path *outside* the container varies by engine, so rig resolves it rather than assuming:
+
+| Setup | Socket rig mounts |
+|---|---|
+| Docker on Linux | `/var/run/docker.sock` |
+| Rootless Docker | `$XDG_RUNTIME_DIR/docker.sock` |
+| Rootless Podman | `$XDG_RUNTIME_DIR/podman/podman.sock` |
+| Rootful Podman | `/run/podman/podman.sock` |
+| macOS (Docker Desktop, OrbStack, Podman machine, Colima) | `/var/run/docker.sock` inside the engine VM |
+
+`DOCKER_HOST` wins when it points at a unix socket rig can reach. On Linux, candidates that cannot be reached are skipped — under rootless Podman, `/var/run/docker.sock` is often a symlink to the root-owned `/run/podman/podman.sock`, and mounting it fails container creation with `statfs /var/run/docker.sock: permission denied`. On macOS the engine runs in a VM with its own filesystem, so the conventional in-VM path is used.
+
+If no socket can be reached, rig still starts the container and prints a note — everything works except testcontainers and the in-container `docker` CLI. Switching engines changes the mount, so rig recreates the container automatically on the next `rig up`.
 
 ### Security: No Privileged Mode
 
-Rig does **not** run containers in privileged mode. Instead, it mounts the host's Docker socket (`/var/run/docker.sock`) into the container. This approach:
+Rig does **not** run containers in privileged mode. Instead, it mounts the engine socket into the container. This approach:
 
 - **Avoids privileged mode** — No elevated kernel capabilities or direct root access to the host
-- **Uses the host's Docker daemon** — Containers you create are siblings, not nested children
+- **Uses the host's engine** — Containers you create are siblings, not nested children
 - **Works with Testcontainers** — Pre-configured environment variables ensure compatibility
 
 This is safer than true Docker-in-Docker (which requires `--privileged`), while still enabling full Docker workflows inside your development environment.
 
-For maximum isolation (working with untrusted code), run rig inside a VM — just install Docker in the VM and run rig as normal.
+For maximum isolation (working with untrusted code), run rig inside a VM — just install Docker or Podman in the VM and run rig as normal.
+
+Note that rootless Podman is itself an isolation improvement: the engine runs as your user rather than root, so a container that reaches the socket cannot trivially become root on the host.
 
 ## Building from Source
 
@@ -275,7 +300,7 @@ cd rig
 make build
 ```
 
-Requires Go 1.22+ and Docker.
+Requires Go 1.22+ and Docker or Podman.
 
 ## License
 
