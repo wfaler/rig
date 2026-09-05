@@ -265,9 +265,9 @@ func TestExpandEnvVars(t *testing.T) {
 
 func TestLanguageConfigGetVersion(t *testing.T) {
 	tests := []struct {
-		name    string
-		config  LanguageConfig
-		want    string
+		name   string
+		config LanguageConfig
+		want   string
 	}{
 		{
 			name:   "explicit version",
@@ -600,6 +600,67 @@ func TestValidateMultipleBuildSystems(t *testing.T) {
 			if tt.wantErr {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestHerdrDefaults(t *testing.T) {
+	// Default: enabled, agent "claude"
+	cfg := &Config{}
+	assert.True(t, cfg.IsHerdrEnabled())
+	assert.Equal(t, "claude", cfg.GetHerdrAgent())
+
+	// Explicitly disabled
+	disabled := false
+	cfg2 := &Config{Herdr: &HerdrConfig{Enabled: &disabled}}
+	assert.False(t, cfg2.IsHerdrEnabled())
+
+	// Explicitly enabled with custom agent
+	enabled := true
+	cfg3 := &Config{Herdr: &HerdrConfig{Enabled: &enabled, Agent: "gemini"}}
+	assert.True(t, cfg3.IsHerdrEnabled())
+	assert.Equal(t, "gemini", cfg3.GetHerdrAgent())
+
+	// Present but enabled unset -> still enabled by default
+	cfg4 := &Config{Herdr: &HerdrConfig{Agent: "codex"}}
+	assert.True(t, cfg4.IsHerdrEnabled())
+	assert.Equal(t, "codex", cfg4.GetHerdrAgent())
+}
+
+func TestParseWithHerdr(t *testing.T) {
+	yaml := `
+herdr:
+  enabled: false
+  agent: gemini
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	assert.False(t, cfg.IsHerdrEnabled())
+	assert.Equal(t, "gemini", cfg.GetHerdrAgent())
+}
+
+func TestHerdrAgentValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		agent   string
+		wantErr bool
+	}{
+		{"claude ok", "claude", false},
+		{"gemini ok", "gemini", false},
+		{"codex ok", "codex", false},
+		{"empty ok (defaults)", "", false},
+		{"unknown rejected", "bogus", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{Herdr: &HerdrConfig{Agent: tt.agent}}
+			err := cfg.Validate()
+			if tt.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "unsupported herdr agent")
 			} else {
 				require.NoError(t, err)
 			}

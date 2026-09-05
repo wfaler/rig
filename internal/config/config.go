@@ -16,6 +16,7 @@ type Config struct {
 	Env            map[string]string         `yaml:"env"`
 	CodeServer     *CodeServerConfig         `yaml:"code_server"`
 	MarkdownServer *MarkdownServerConfig     `yaml:"markdown_server"`
+	Herdr          *HerdrConfig              `yaml:"herdr"`
 	Shell          string                    `yaml:"shell"` // bash (default), zsh, fish
 }
 
@@ -92,6 +93,42 @@ func (c *Config) GetMarkdownServerPort() int {
 		return 3030
 	}
 	return c.MarkdownServer.Port
+}
+
+// HerdrConfig defines integration with the herdr terminal agent multiplexer.
+// When rig runs inside a herdr-managed pane, this controls whether the herdr
+// CLI and agent skill are baked into the image so the containerized agent can
+// talk back to the herdr socket.
+type HerdrConfig struct {
+	Enabled *bool  `yaml:"enabled"` // nil means "default" (enabled)
+	Agent   string `yaml:"agent"`   // HERDR_AGENT value herdr uses to detect the agent (default: "claude")
+}
+
+// SupportedHerdrAgents lists the agent identifiers herdr can be told to detect.
+var SupportedHerdrAgents = map[string]bool{
+	"claude": true,
+	"gemini": true,
+	"codex":  true,
+}
+
+// DefaultHerdrAgent is used when no herdr.agent is configured.
+const DefaultHerdrAgent = "claude"
+
+// IsHerdrEnabled reports whether herdr integration should be baked into the
+// image. It is enabled by default unless explicitly disabled.
+func (c *Config) IsHerdrEnabled() bool {
+	if c.Herdr == nil || c.Herdr.Enabled == nil {
+		return true // enabled by default
+	}
+	return *c.Herdr.Enabled
+}
+
+// GetHerdrAgent returns the configured HERDR_AGENT value, defaulting to "claude".
+func (c *Config) GetHerdrAgent() string {
+	if c.Herdr == nil || c.Herdr.Agent == "" {
+		return DefaultHerdrAgent
+	}
+	return c.Herdr.Agent
 }
 
 // GetAllPorts returns all configured ports, including code-server port if enabled
@@ -221,6 +258,11 @@ func (c *Config) Validate() error {
 	// Validate shell
 	if c.Shell != "" && !SupportedShells[c.Shell] {
 		return fmt.Errorf("unsupported shell: %s (supported: bash, zsh, fish)", c.Shell)
+	}
+
+	// Validate herdr agent
+	if c.Herdr != nil && c.Herdr.Agent != "" && !SupportedHerdrAgents[c.Herdr.Agent] {
+		return fmt.Errorf("unsupported herdr agent: %s (supported: claude, gemini, codex)", c.Herdr.Agent)
 	}
 
 	return nil

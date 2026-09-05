@@ -42,7 +42,14 @@ env: {}
 # shell: zsh
 
 markdown_server:
-  port: 3031       
+  port: 3031
+
+# herdr integration — explicit so the rebuilt image bakes in the herdr CLI +
+# agent skill and rig wires the container into the herdr socket at `rig up`.
+herdr:
+  enabled: true
+  agent: claude
+
 # VS Code in browser (code-server)
 code_server:
   enabled: false 

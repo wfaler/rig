@@ -7,6 +7,7 @@ import (
 	"text/template"
 
 	"github.com/wfaler/rig/internal/config"
+	"github.com/wfaler/rig/internal/herdr"
 )
 
 // TemplateData holds the data passed to the Dockerfile template
@@ -22,6 +23,9 @@ type TemplateData struct {
 	CodeServerExtensions []string
 	MarkdownServer       bool
 	MarkdownServerPort   int
+	Herdr                bool
+	HerdrAgent           string
+	HerdrSocketPath      string
 	Shell                string
 }
 
@@ -69,6 +73,9 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 		CodeServerExtensions: extensions,
 		MarkdownServer:       cfg.IsMarkdownServerEnabled(),
 		MarkdownServerPort:   cfg.GetMarkdownServerPort(),
+		Herdr:                cfg.IsHerdrEnabled(),
+		HerdrAgent:           cfg.GetHerdrAgent(),
+		HerdrSocketPath:      herdr.ContainerSocketPath,
 		Shell:                cfg.GetShell(),
 	}
 
@@ -89,6 +96,10 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 
 	if cfg.IsMarkdownServerEnabled() {
 		ctx.ExtraFiles["rig-md-server.js"] = []byte(GetMarkdownServerScript())
+	}
+
+	if cfg.IsHerdrEnabled() {
+		ctx.ExtraFiles["rig-sandbox-skill.md"] = []byte(rigSandboxSkill)
 	}
 
 	return ctx, nil

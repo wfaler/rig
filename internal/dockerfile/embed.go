@@ -14,6 +14,9 @@ var markdownClientJS string
 //go:embed scripts/rig-md-styles.css
 var markdownCSS string
 
+//go:embed scripts/rig-sandbox-skill.md
+var rigSandboxSkill string
+
 // MarkdownServerScript returns the server JS with CSS and client JS injected.
 func GetMarkdownServerScript() string {
 	// Escape the CSS and client JS for embedding as JS string literals

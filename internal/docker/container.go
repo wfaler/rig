@@ -8,6 +8,7 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/go-connections/nat"
+	"github.com/wfaler/rig/internal/herdr"
 )
 
 // FindContainer returns container ID if it exists, empty string otherwise
@@ -40,9 +41,17 @@ func (c *Client) CreateContainer(ctx context.Context, cfg ContainerConfig) (stri
 	}
 
 	// Build environment slice
-	envSlice := make([]string, 0, len(cfg.Env))
+	envSlice := make([]string, 0, len(cfg.Env)+2)
 	for k, v := range cfg.Env {
 		envSlice = append(envSlice, fmt.Sprintf("%s=%s", k, v))
+	}
+	// Expose the host path of /workspace so in-container tooling (e.g. agents
+	// spawning sibling herdr panes) can reference the project by its host path.
+	envSlice = append(envSlice, fmt.Sprintf("%s=%s", EnvHostWorkdir, cfg.WorkDir))
+	// Expose the herdr TCP bridge port so the entrypoint can start the
+	// socat unix-socket shim (macOS path).
+	if cfg.HerdrProxyPort != 0 {
+		envSlice = append(envSlice, fmt.Sprintf("%s=%d", herdr.EnvProxyPort, cfg.HerdrProxyPort))
 	}
 
 	// Container configuration
@@ -59,14 +68,20 @@ func (c *Client) CreateContainer(ctx context.Context, cfg ContainerConfig) (stri
 		WorkingDir:   "/workspace",
 	}
 
+	// Base mounts: project directory and Docker socket for DinD (testcontainers).
+	binds := []string{
+		fmt.Sprintf("%s:/workspace:rw", cfg.WorkDir),
+		"/var/run/docker.sock:/var/run/docker.sock",
+	}
+	// When running inside herdr, bind-mount its control socket so the
+	// containerized agent can drive herdr over the socket API.
+	if cfg.HerdrSocketHostPath != "" {
+		binds = append(binds, fmt.Sprintf("%s:%s", cfg.HerdrSocketHostPath, herdr.ContainerSocketPath))
+	}
+
 	// Host configuration with mounts
 	hostCfg := &container.HostConfig{
-		Binds: []string{
-			// Mount project directory
-			fmt.Sprintf("%s:/workspace:rw", cfg.WorkDir),
-			// Docker socket for DinD (testcontainers support)
-			"/var/run/docker.sock:/var/run/docker.sock",
-		},
+		Binds:         binds,
 		PortBindings:  portBindings,
 		Privileged:    false, // Socket mount doesn't need privileged mode
 		NetworkMode:   "bridge",
@@ -139,6 +154,45 @@ func (c *Client) GetContainerImage(ctx context.Context, containerID string) (str
 		return "", fmt.Errorf("inspecting container: %w", err)
 	}
 	return info.Config.Image, nil
+}
+
+// GetHerdrSocketHostPath returns the host source path of the herdr socket bind
+// mount (destination herdr.ContainerSocketPath) for a container, or "" if none.
+func (c *Client) GetHerdrSocketHostPath(ctx context.Context, containerID string) (string, error) {
+	info, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return "", fmt.Errorf("inspecting container: %w", err)
+	}
+	if info.HostConfig == nil {
+		return "", nil
+	}
+	for _, bind := range info.HostConfig.Binds {
+		// Binds are "source:destination[:options]".
+		parts := strings.Split(bind, ":")
+		if len(parts) >= 2 && parts[1] == herdr.ContainerSocketPath {
+			return parts[0], nil
+		}
+	}
+	return "", nil
+}
+
+// GetContainerEnvValue returns the value of an environment variable baked into
+// a container's config at create time, or "" if unset.
+func (c *Client) GetContainerEnvValue(ctx context.Context, containerID string, key string) (string, error) {
+	info, err := c.cli.ContainerInspect(ctx, containerID)
+	if err != nil {
+		return "", fmt.Errorf("inspecting container: %w", err)
+	}
+	if info.Config == nil {
+		return "", nil
+	}
+	prefix := key + "="
+	for _, kv := range info.Config.Env {
+		if strings.HasPrefix(kv, prefix) {
+			return strings.TrimPrefix(kv, prefix), nil
+		}
+	}
+	return "", nil
 }
 
 // RigContainer represents a rig container with its status info

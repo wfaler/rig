@@ -19,7 +19,15 @@
       "Bash(go install:*)",
       "Bash(go doc:*)",
       "WebFetch(domain:github.com)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(env)",
+      "WebFetch(domain:herdr.dev)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Skill(update-config)",
+      "Bash(echo \"BUILD EXIT: $?\")",
+      "Bash(echo \"BUILD: $?\")",
+      "Bash(/opt/homebrew/bin/rig rebuild *)",
+      "Bash(docker exec *)"
     ]
   }
 }

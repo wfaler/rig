@@ -419,3 +419,64 @@ func TestGenerateWithShellConfiguration(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateHerdr(t *testing.T) {
+	enabled := true
+	disabled := false
+
+	herdrMarkers := []string{
+		"releases/latest/download/herdr-linux-",
+		"/usr/local/bin/herdr",
+		"skills/herdr/SKILL.md",
+		"Fix herdr socket permissions",
+		"/run/herdr/herdr.sock",
+		"socat",
+		"RIG_HERDR_PROXY_PORT",
+		"rig-sandbox-skill.md",
+		"skills/rig-sandbox/SKILL.md",
+	}
+
+	t.Run("enabled by default", func(t *testing.T) {
+		cfg := &config.Config{
+			Languages: map[string]config.LanguageConfig{},
+			Env:       map[string]string{},
+		}
+		buildCtx, err := Generate(cfg)
+		require.NoError(t, err)
+		for _, m := range herdrMarkers {
+			assert.Contains(t, buildCtx.Dockerfile, m, "default config should install herdr: %s", m)
+		}
+		assert.Contains(t, buildCtx.ExtraFiles, "rig-sandbox-skill.md")
+		assert.Contains(t, string(buildCtx.ExtraFiles["rig-sandbox-skill.md"]), "RIG_HOST_WORKDIR")
+	})
+
+	t.Run("explicitly enabled", func(t *testing.T) {
+		cfg := &config.Config{
+			Languages: map[string]config.LanguageConfig{},
+			Env:       map[string]string{},
+			Herdr:     &config.HerdrConfig{Enabled: &enabled},
+		}
+		buildCtx, err := Generate(cfg)
+		require.NoError(t, err)
+		for _, m := range herdrMarkers {
+			assert.Contains(t, buildCtx.Dockerfile, m)
+		}
+	})
+
+	t.Run("disabled omits all herdr content", func(t *testing.T) {
+		cfg := &config.Config{
+			Languages: map[string]config.LanguageConfig{},
+			Env:       map[string]string{},
+			Herdr:     &config.HerdrConfig{Enabled: &disabled},
+		}
+		buildCtx, err := Generate(cfg)
+		require.NoError(t, err)
+		for _, m := range herdrMarkers {
+			assert.NotContains(t, buildCtx.Dockerfile, m, "disabled config must not install herdr: %s", m)
+		}
+		assert.NotContains(t, buildCtx.ExtraFiles, "rig-sandbox-skill.md")
+		// Structural invariants still hold.
+		assert.True(t, strings.HasPrefix(buildCtx.Dockerfile, "FROM "))
+		assert.Contains(t, buildCtx.Dockerfile, "CMD [")
+	})
+}

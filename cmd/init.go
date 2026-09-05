@@ -74,6 +74,14 @@ env: {}
 #   enabled: false                       # set to false to disable
 #   port: 3030                           # default: 3030
 
+# herdr integration (https://herdr.dev)
+# When rig runs inside a herdr-managed pane, it auto-sets HERDR_AGENT, mounts
+# the herdr control socket into the container, and installs the herdr CLI +
+# agent skill so the containerized agent can drive herdr. Enabled by default.
+# herdr:
+#   enabled: false                       # set to false to skip herdr CLI/skill
+#   agent: claude                        # HERDR_AGENT value: claude, gemini, codex
+
 # VS Code in browser (code-server)
 # code_server:
 #   enabled: true

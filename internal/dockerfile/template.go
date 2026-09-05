@@ -38,7 +38,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libreadline-dev \
     libsqlite3-dev \
     libffi-dev \
-{{ if eq .Shell "zsh" }}    zsh \
+{{ if .Herdr }}    socat \
+{{ end }}{{ if eq .Shell "zsh" }}    zsh \
 {{ else if eq .Shell "fish" }}    fish \
 {{ end }}    && rm -rf /var/lib/apt/lists/*
 
@@ -81,6 +82,19 @@ RUN printf '%s\n' '#!/bin/bash' \
     'if [ -S /var/run/docker.sock ]; then' \
     '  sudo chmod 666 /var/run/docker.sock' \
     'fi' \
+{{ if .Herdr }}    '# Fix herdr socket permissions if mounted (Linux bind-mount path)' \
+    'if [ -S {{ .HerdrSocketPath }} ]; then' \
+    '  sudo chmod 666 {{ .HerdrSocketPath }} 2>/dev/null || true' \
+    'fi' \
+    '# Bridge the herdr socket over TCP when rig provides a proxy port (macOS' \
+    '# path: unix sockets cannot cross the Docker VM boundary, so rig proxies' \
+    '# the host socket on a loopback port and socat re-exposes it here)' \
+    'if [ -n "${RIG_HERDR_PROXY_PORT}" ] && [ ! -S {{ .HerdrSocketPath }} ]; then' \
+    '  sudo mkdir -p /run/herdr' \
+    '  sudo chown developer /run/herdr' \
+    '  (socat UNIX-LISTEN:{{ .HerdrSocketPath }},fork,unlink-early,mode=666 TCP:host.docker.internal:${RIG_HERDR_PROXY_PORT} > /tmp/herdr-proxy.log 2>&1 &)' \
+    'fi' \
+{{ end }}
     '# Start code-server in background if installed' \
     'if command -v code-server > /dev/null 2>&1; then' \
     '  code-server --bind-addr 0.0.0.0:${CODE_SERVER_PORT:-8080} --auth none > /tmp/code-server.log 2>&1 &' \
@@ -134,6 +148,29 @@ RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Install other AI agents via npm
 RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g @google/gemini-cli openai
+
+{{ if .Herdr }}
+# Install the herdr CLI (static binary) so a containerized agent can drive the
+# herdr control socket API. uname -m yields x86_64/aarch64, matching the release
+# asset names.
+USER root
+RUN HERDR_ARCH="$(uname -m)" \
+    && curl -fsSL "https://github.com/herdrdev/herdr/releases/latest/download/herdr-linux-${HERDR_ARCH}" -o /usr/local/bin/herdr \
+    && chmod 755 /usr/local/bin/herdr
+USER developer
+
+# Install the herdr agent skill so Claude Code auto-discovers it
+RUN mkdir -p /home/developer/.claude/skills/herdr \
+    && curl -fsSL https://raw.githubusercontent.com/herdrdev/herdr/master/skills/herdr/SKILL.md \
+       -o /home/developer/.claude/skills/herdr/SKILL.md
+
+# Install the rig sandbox skill so in-container agents spawn new herdr panes
+# through rig (sandboxed) instead of as bare host shells
+USER root
+COPY rig-sandbox-skill.md /home/developer/.claude/skills/rig-sandbox/SKILL.md
+RUN chown -R developer:developer /home/developer/.claude/skills/rig-sandbox
+USER developer
+{{ end }}
 
 {{ .BuildSystemInstalls }}
 

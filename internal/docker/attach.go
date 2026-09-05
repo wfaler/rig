@@ -6,17 +6,22 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 
 	"github.com/docker/docker/api/types/container"
 	"github.com/moby/term"
 )
 
-// Attach connects stdin/stdout to a container with TTY support
-func (c *Client) Attach(ctx context.Context, containerID string, command []string) error {
+// Attach connects stdin/stdout to a container with TTY support. Extra
+// environment variables (env) are injected into the exec session; this is used
+// to pass per-session herdr context that must not be baked into the cached
+// container at create time.
+func (c *Client) Attach(ctx context.Context, containerID string, command []string, env map[string]string) error {
 	// Create exec instance to run the command
 	execConfig := container.ExecOptions{
 		Cmd:          command,
+		Env:          envMapToSlice(env),
 		AttachStdin:  true,
 		AttachStdout: true,
 		AttachStderr: true,
@@ -108,6 +113,24 @@ func (c *Client) Attach(ctx context.Context, containerID string, command []strin
 	}
 
 	return nil
+}
+
+// envMapToSlice converts an env map to a sorted "KEY=VALUE" slice. Sorting
+// keeps the output deterministic (useful for tests and reproducibility).
+func envMapToSlice(env map[string]string) []string {
+	if len(env) == 0 {
+		return nil
+	}
+	keys := make([]string, 0, len(env))
+	for k := range env {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make([]string, 0, len(env))
+	for _, k := range keys {
+		out = append(out, k+"="+env[k])
+	}
+	return out
 }
 
 // handleResize monitors for resize requests

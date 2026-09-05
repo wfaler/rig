@@ -182,11 +182,53 @@ code_server:
 
 Run `rig init` to see recommended extensions for each language.
 
+## Running Inside herdr
+
+[herdr](https://herdr.dev) is a terminal multiplexer for AI coding agents. When you run `rig up` inside a herdr-managed pane, rig wires the containerized agent into herdr automatically:
+
+- **Agent detection** — rig sets `HERDR_AGENT` (default `claude`) on itself so herdr can detect the agent through the container. It does this by re-executing with the variable set, since herdr reads it from the foreground process.
+- **Socket access** — herdr's control socket is reachable inside the container at `/run/herdr/herdr.sock`, and `HERDR_SOCKET_PATH`, `HERDR_ENV`, and the pane/workspace/tab IDs are injected into your shell. So `herdr pane current`, `herdr pane split`, etc. work from inside the sandbox exactly as they do on the host.
+- **CLI + skills** — the herdr CLI (single static binary), the herdr agent skill, and rig's own `rig-sandbox` skill are baked into the image, so an agent like Claude Code can spawn and monitor other agents over the socket API.
+
+This is enabled by default and only activates when herdr is present. Configure or disable it in `.rig.yml`:
+
+```yaml
+herdr:
+  enabled: true      # default; set false to omit the herdr CLI + skills
+  agent: claude      # HERDR_AGENT value: claude, gemini, or codex
+```
+
+If your agent isn't detected, make sure you launched `rig up` from within a herdr pane (`HERDR_ENV=1`). You can also set it explicitly: `HERDR_AGENT=claude rig up`.
+
+### Spawning sandboxed sessions
+
+New herdr panes are spawned by herdr on the **host**, so by default a pane created from inside a container would be an unsandboxed host shell. Rig closes that gap so agents can delegate work without escaping the sandbox:
+
+- Every container exposes `RIG_HOST_WORKDIR` — the host path mounted at `/workspace`.
+- The bundled `rig-sandbox` skill teaches agents the pattern: split a pane with `--cwd "$RIG_HOST_WORKDIR"`, run `rig up` in it, and wait for the container shell before sending any work.
+
+```bash
+# From inside a rig container:
+herdr pane split --direction right --cwd "$RIG_HOST_WORKDIR" --no-focus   # note pane_id
+herdr pane run <pane_id> "rig up"
+herdr pane wait-output <pane_id> --match "/workspace" --timeout 120000
+herdr pane run <pane_id> "make test"    # runs inside the sandbox
+```
+
+The same `--cwd` joins the same project container (shared filesystem, separate shell); a different project's host directory gets that project's own container.
+
+### How the socket reaches the container
+
+On **Linux**, the herdr socket is bind-mounted directly — unix sockets work across bind mounts when host and container share a kernel.
+
+On **macOS**, unix sockets cannot cross the Docker VM boundary (the bind-mounted file appears, but connecting to it fails — true of OrbStack and Docker Desktop alike). Rig bridges instead: the host `rig up` process listens on a deterministic loopback TCP port and forwards to the socket, while `socat` inside the container re-exposes it at `/run/herdr/herdr.sock`. This is automatic; the only visible difference is that in-container herdr access requires a `rig up` session to be attached (which is the only time it's meaningful anyway).
+
 ## What's Inside
 
 Every rig container includes:
 
 - **AI Assistants**: Claude Code, Gemini CLI, OpenAI CLI, GitHub CLI
+- **herdr Integration**: herdr CLI + agent skills for orchestrating agents and spawning sandboxed sessions from inside a herdr pane
 - **Documentation Server**: Live-reload markdown renderer with mermaid support
 - **Dev Tools**: git, curl, wget, jq, vim, tmux, build-essential
 - **Docker CLI**: For testcontainers and Docker workflows
