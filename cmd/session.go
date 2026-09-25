@@ -131,6 +131,10 @@ func runSession(command []string) error {
 		fmt.Println("      Set DOCKER_HOST to your engine's socket (e.g. unix://$XDG_RUNTIME_DIR/podman/podman.sock) and recreate the container.")
 	}
 
+	// Rootless Podman needs keep-id so the image's developer user can write to
+	// the workspace; other engines use their default mapping.
+	usernsMode := dockerClient.DesiredUsernsMode(ctx)
+
 	// Always expose the host workdir in the interactive session too, so
 	// containers created by older rig versions pick it up without recreation.
 	if attachEnv == nil {
@@ -176,13 +180,19 @@ func runSession(command []string) error {
 		if err != nil {
 			return fmt.Errorf("inspecting docker socket mount: %w", err)
 		}
+		// The user namespace mode is fixed at create time as well.
+		existingUsernsMode, err := dockerClient.GetContainerEnvValue(ctx, containerID, docker.EnvUsernsMode)
+		if err != nil {
+			return fmt.Errorf("inspecting userns env: %w", err)
+		}
 		desiredProxyPort := ""
 		if herdrProxyPort != 0 {
 			desiredProxyPort = strconv.Itoa(herdrProxyPort)
 		}
 
 		if currentImage == imageRef && existingHerdrSocket == herdrSocket &&
-			existingProxyPort == desiredProxyPort && existingDockerSocket == hostDockerSocket {
+			existingProxyPort == desiredProxyPort && existingDockerSocket == hostDockerSocket &&
+			existingUsernsMode == usernsMode {
 			// Same image and herdr state - reuse container
 			if running {
 				// Already running - just exec into it
@@ -203,7 +213,7 @@ func runSession(command []string) error {
 			return nil
 		}
 
-		// Image, herdr state or engine socket changed - remove and recreate
+		// Image, herdr state, engine socket or userns mode changed - remove and recreate
 		fmt.Printf("Config changed, recreating container...\n")
 		if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
 			return fmt.Errorf("removing old container: %w", err)
@@ -222,6 +232,7 @@ func runSession(command []string) error {
 		DockerSocketHostPath: hostDockerSocket,
 		HerdrSocketHostPath:  herdrSocket,
 		HerdrProxyPort:       herdrProxyPort,
+		UsernsMode:           usernsMode,
 	})
 	if err != nil {
 		return fmt.Errorf("creating container: %w", err)

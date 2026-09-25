@@ -59,6 +59,10 @@ type DockerClient interface {
 	// into a container's config at create time, or "" if unset.
 	GetContainerEnvValue(ctx context.Context, containerID string, key string) (string, error)
 
+	// DesiredUsernsMode returns the user namespace mode rig containers should
+	// be created with on the connected engine, or "" for the engine default.
+	DesiredUsernsMode(ctx context.Context) string
+
 	// Attach connects stdin/stdout to a container with TTY support, injecting
 	// the given extra environment variables into the exec session.
 	Attach(ctx context.Context, containerID string, command []string, env map[string]string) error
@@ -90,4 +94,10 @@ type ContainerConfig struct {
 	// herdr.EnvProxyPort so the entrypoint can re-expose it as a unix socket
 	// via socat. Used on macOS, where sockets cannot cross the VM boundary.
 	HerdrProxyPort int
+
+	// UsernsMode, when non-empty, is the user namespace mode to create the
+	// container with (e.g. UsernsKeepID under rootless Podman). It is also
+	// recorded as EnvUsernsMode so a change can be detected. Resolve it with
+	// DesiredUsernsMode.
+	UsernsMode string
 }

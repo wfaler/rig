@@ -53,6 +53,11 @@ func (c *Client) CreateContainer(ctx context.Context, cfg ContainerConfig) (stri
 	if cfg.HerdrProxyPort != 0 {
 		envSlice = append(envSlice, fmt.Sprintf("%s=%d", herdr.EnvProxyPort, cfg.HerdrProxyPort))
 	}
+	// Record the user namespace mode, which engines do not report back
+	// faithfully on inspect.
+	if cfg.UsernsMode != "" {
+		envSlice = append(envSlice, fmt.Sprintf("%s=%s", EnvUsernsMode, cfg.UsernsMode))
+	}
 
 	// Container configuration
 	containerCfg := &container.Config{
@@ -91,6 +96,7 @@ func (c *Client) CreateContainer(ctx context.Context, cfg ContainerConfig) (stri
 		Privileged:    false, // Socket mount doesn't need privileged mode
 		NetworkMode:   "bridge",
 		RestartPolicy: container.RestartPolicy{Name: "no"},
+		UsernsMode:    container.UsernsMode(cfg.UsernsMode),
 		// Add host.docker.internal for Linux (Docker Desktop on Mac/Windows adds this automatically)
 		ExtraHosts: []string{"host.docker.internal:host-gateway"},
 	}
