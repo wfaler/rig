@@ -158,13 +158,16 @@ func (c *Client) IsContainerRunning(ctx context.Context, containerID string) (bo
 	return info.State.Running, nil
 }
 
-// GetContainerImage returns the image reference used by a container
-func (c *Client) GetContainerImage(ctx context.Context, containerID string) (string, error) {
+// GetContainerImageID returns the ID of the image a container was created
+// from. The ID is compared rather than the reference because engines do not
+// echo the reference back verbatim: Podman reports "rig-foo:tag" as
+// "docker.io/library/rig-foo:tag".
+func (c *Client) GetContainerImageID(ctx context.Context, containerID string) (string, error) {
 	info, err := c.cli.ContainerInspect(ctx, containerID)
 	if err != nil {
 		return "", fmt.Errorf("inspecting container: %w", err)
 	}
-	return info.Config.Image, nil
+	return info.Image, nil
 }
 
 // GetHerdrSocketHostPath returns the host source path of the herdr socket bind

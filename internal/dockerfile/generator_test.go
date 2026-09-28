@@ -480,3 +480,46 @@ func TestGenerateHerdr(t *testing.T) {
 		assert.Contains(t, buildCtx.Dockerfile, "CMD [")
 	})
 }
+
+func TestGenerateIncludesUpdateScript(t *testing.T) {
+	tests := []struct {
+		name   string
+		config *config.Config
+	}{
+		{"default config", &config.Config{}},
+		{"everything enabled", &config.Config{
+			Languages: map[string]config.LanguageConfig{
+				"python": {BuildSystems: map[string]string{"poetry": "true"}},
+				"java":   {BuildSystems: map[string]string{"gradle": "true"}},
+			},
+			CodeServer: &config.CodeServerConfig{Enabled: true},
+		}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			buildCtx, err := Generate(tt.config)
+			require.NoError(t, err)
+
+			want, err := GenerateUpdateScript(tt.config)
+			require.NoError(t, err)
+			assert.Equal(t, want, string(buildCtx.ExtraFiles["rig-update"]))
+			assert.Contains(t, buildCtx.Dockerfile, "COPY rig-update "+UpdateScriptPath)
+			assert.Contains(t, buildCtx.Dockerfile, "chmod 755 "+UpdateScriptPath)
+		})
+	}
+}
+
+// TestDockerfileAndUpdateScriptShareSources guards against the two drifting
+// apart: an update must refresh exactly what the image installed.
+func TestDockerfileAndUpdateScriptShareSources(t *testing.T) {
+	cfg := &config.Config{CodeServer: &config.CodeServerConfig{Enabled: true}}
+	buildCtx, err := Generate(cfg)
+	require.NoError(t, err)
+	script, err := GenerateUpdateScript(cfg)
+	require.NoError(t, err)
+
+	for _, shared := range []string{agentNPMPackages, markdownNPMPackage, herdrBinaryURL, herdrSkillURL, codeServerInstall} {
+		assert.Contains(t, buildCtx.Dockerfile, shared)
+		assert.Contains(t, script, shared)
+	}
+}

@@ -149,6 +149,12 @@ func TestGenerateBuildSystemInstall(t *testing.T) {
 			wantContains: []string{"pip install pipenv"},
 		},
 		{
+			name:         "python pipenv with version",
+			lang:         "python",
+			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"pipenv": "2024.0.1"}},
+			wantContains: []string{"# Install Pipenv 2024.0.1", "pip install pipenv==2024.0.1"},
+		},
+		{
 			name:         "python uv",
 			lang:         "python",
 			cfg:          config.LanguageConfig{BuildSystems: map[string]string{"uv": "true"}},

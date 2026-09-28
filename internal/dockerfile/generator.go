@@ -27,6 +27,14 @@ type TemplateData struct {
 	HerdrAgent           string
 	HerdrSocketPath      string
 	Shell                string
+
+	// Install commands shared with the update script
+	AgentNPMPackages   string
+	MarkdownNPMPackage string
+	HerdrBinaryURL     string
+	HerdrSkillURL      string
+	CodeServerInstall  string
+	UpdateScriptPath   string
 }
 
 // BuildContext holds the Dockerfile and any extra files needed in the build context
@@ -77,6 +85,12 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 		HerdrAgent:           cfg.GetHerdrAgent(),
 		HerdrSocketPath:      herdr.ContainerSocketPath,
 		Shell:                cfg.GetShell(),
+		AgentNPMPackages:     agentNPMPackages,
+		MarkdownNPMPackage:   markdownNPMPackage,
+		HerdrBinaryURL:       herdrBinaryURL,
+		HerdrSkillURL:        herdrSkillURL,
+		CodeServerInstall:    codeServerInstall,
+		UpdateScriptPath:     UpdateScriptPath,
 	}
 
 	tmpl, err := template.New("dockerfile").Parse(BaseTemplate)
@@ -93,6 +107,12 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 		Dockerfile: buf.String(),
 		ExtraFiles: make(map[string][]byte),
 	}
+
+	updateScript, err := GenerateUpdateScript(cfg)
+	if err != nil {
+		return nil, err
+	}
+	ctx.ExtraFiles[updateScriptFile] = []byte(updateScript)
 
 	if cfg.IsMarkdownServerEnabled() {
 		ctx.ExtraFiles["rig-md-server.js"] = []byte(GetMarkdownServerScript())

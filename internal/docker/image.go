@@ -27,6 +27,32 @@ func (c *Client) ImageExists(ctx context.Context, imageRef string) (bool, error)
 	return true, nil
 }
 
+// ImageID returns the ID of the image with the given ref
+func (c *Client) ImageID(ctx context.Context, imageRef string) (string, error) {
+	info, err := c.cli.ImageInspect(ctx, imageRef)
+	if err != nil {
+		return "", fmt.Errorf("inspecting image: %w", err)
+	}
+	return info.ID, nil
+}
+
+// localRepoPrefixes are the prefixes engines add when reporting a locally
+// built image tagged with a bare name: Podman qualifies "rig-foo" as
+// "docker.io/library/rig-foo" (or "localhost/rig-foo" for podman build).
+var localRepoPrefixes = []string{"", "docker.io/library/", "localhost/"}
+
+// tagMatchesImageName reports whether a repo tag as listed by the engine
+// refers to imageName, with any tag and any local repository qualification.
+func tagMatchesImageName(tag, imageName string) bool {
+	for _, prefix := range localRepoPrefixes {
+		qualified := prefix + imageName
+		if tag == qualified || strings.HasPrefix(tag, qualified+":") {
+			return true
+		}
+	}
+	return false
+}
+
 // BuildImage builds a Docker image from a Dockerfile string and optional extra files
 func (c *Client) BuildImage(ctx context.Context, dockerfile string, imageRef string, extraFiles map[string][]byte) error {
 	// Create tar archive with Dockerfile and extra files in memory
@@ -138,8 +164,7 @@ func (c *Client) RemoveImagesByName(ctx context.Context, imageName string) error
 	var removed int
 	for _, img := range images {
 		for _, tag := range img.RepoTags {
-			// Check if the image name matches (before the :tag)
-			if strings.HasPrefix(tag, imageName+":") || tag == imageName {
+			if tagMatchesImageName(tag, imageName) {
 				fmt.Printf("Removing image %s...\n", tag)
 				_, err := c.cli.ImageRemove(ctx, img.ID, image.RemoveOptions{Force: true, PruneChildren: true})
 				if err != nil {

@@ -84,9 +84,11 @@ func runSession(command []string) error {
 		return fmt.Errorf("checking image: %w", err)
 	}
 
-	if !imageExists {
+	if imageExists {
+		fmt.Printf("Using existing image %s (.rig.yml unchanged since it was built)\n", imageRef)
+	} else {
 		// Generate Dockerfile
-		fmt.Printf("Building image %s...\n", imageRef)
+		fmt.Printf("No image %s for the current .rig.yml - building it...\n", imageRef)
 		buildCtx, err := dockerfile.Generate(cfg)
 		if err != nil {
 			return fmt.Errorf("generating dockerfile: %w", err)
@@ -155,9 +157,13 @@ func runSession(command []string) error {
 			return fmt.Errorf("checking container status: %w", err)
 		}
 
-		currentImage, err := dockerClient.GetContainerImage(ctx, containerID)
+		currentImageID, err := dockerClient.GetContainerImageID(ctx, containerID)
 		if err != nil {
 			return fmt.Errorf("getting container image: %w", err)
+		}
+		desiredImageID, err := dockerClient.ImageID(ctx, imageRef)
+		if err != nil {
+			return fmt.Errorf("getting image ID: %w", err)
 		}
 
 		// Herdr wiring (socket bind mount or bridge port env) is fixed at
@@ -190,10 +196,25 @@ func runSession(command []string) error {
 			desiredProxyPort = strconv.Itoa(herdrProxyPort)
 		}
 
-		if currentImage == imageRef && existingHerdrSocket == herdrSocket &&
-			existingProxyPort == desiredProxyPort && existingDockerSocket == hostDockerSocket &&
-			existingUsernsMode == usernsMode {
-			// Same image and herdr state - reuse container
+		reasons := docker.RecreateReasons(
+			docker.ContainerState{
+				ImageID:        currentImageID,
+				HerdrSocket:    existingHerdrSocket,
+				HerdrProxyPort: existingProxyPort,
+				DockerSocket:   existingDockerSocket,
+				UsernsMode:     existingUsernsMode,
+			},
+			docker.ContainerState{
+				ImageID:        desiredImageID,
+				HerdrSocket:    herdrSocket,
+				HerdrProxyPort: desiredProxyPort,
+				DockerSocket:   hostDockerSocket,
+				UsernsMode:     usernsMode,
+			},
+		)
+
+		if len(reasons) == 0 {
+			// Create-time state matches - reuse container
 			if running {
 				// Already running - just exec into it
 				fmt.Printf("Attaching to running container %s...\n", containerName)
@@ -213,8 +234,10 @@ func runSession(command []string) error {
 			return nil
 		}
 
-		// Image, herdr state, engine socket or userns mode changed - remove and recreate
-		fmt.Printf("Config changed, recreating container...\n")
+		fmt.Printf("Recreating container %s, as its create-time settings changed:\n", containerName)
+		for _, reason := range reasons {
+			fmt.Printf("  - %s\n", reason)
+		}
 		if err := dockerClient.RemoveContainer(ctx, containerID, true); err != nil {
 			return fmt.Errorf("removing old container: %w", err)
 		}

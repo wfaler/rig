@@ -2,6 +2,7 @@ package dockerfile
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/wfaler/rig/internal/config"
 )
@@ -91,17 +92,10 @@ func installWithMise(lang, version string) string {
 RUN mise use --global %s@%s`, lang, lang, miseVersion)
 }
 
-// installPython generates Mise install commands for Python with a post-install
-// fix for the missing lib directory issue in some precompiled builds
-func installPython(version string) string {
-	miseVersion := version
-	if version == "latest" || version == "lts" {
-		miseVersion = "latest"
-	}
-
-	return fmt.Sprintf(`# Install Python via Mise
-RUN mise use --global python@%s \
-    && PYTHON_DIR=$(mise where python) \
+// pythonLibFix works around precompiled Python builds that lack the lib
+// directory, linking it to wherever the build put it. It must run after every
+// Python install or upgrade.
+const pythonLibFix = `PYTHON_DIR=$(mise where python) \
     && if [ ! -d "$PYTHON_DIR/lib" ]; then \
          if [ -d "$PYTHON_DIR/install/lib" ]; then \
            ln -s "$PYTHON_DIR/install/lib" "$PYTHON_DIR/lib"; \
@@ -110,7 +104,17 @@ RUN mise use --global python@%s \
          else \
            mkdir -p "$PYTHON_DIR/lib"; \
          fi; \
-       fi`, miseVersion)
+       fi`
+
+// installPython generates Mise install commands for Python with a post-install
+// fix for the missing lib directory issue in some precompiled builds
+func installPython(version string) string {
+	miseVersion := version
+	if version == "latest" || version == "lts" {
+		miseVersion = "latest"
+	}
+
+	return fmt.Sprintf("# Install Python via Mise\nRUN mise use --global python@%s \\\n    && %s", miseVersion, pythonLibFix)
 }
 
 // installJavaWithSDKMAN installs Java using SDKMAN
@@ -136,41 +140,48 @@ RUN bash -c "source ~/.sdkman/bin/sdkman-init.sh && sdk install java %s"`, sdkma
 // Build system installers
 
 func installNodeBuildSystem(bs string) string {
+	pkg := nodeBuildSystemPackage(bs)
+	if pkg == "" {
+		return ""
+	}
+	return fmt.Sprintf(`# Install %s
+RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g %s`, buildSystemTitle(bs), pkg)
+}
+
+// nodeBuildSystemPackage returns the npm package providing a Node build
+// system, or "" when none is needed (npm ships with Node).
+func nodeBuildSystemPackage(bs string) string {
 	switch bs {
-	case "yarn":
-		return `# Install Yarn
-RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g yarn`
-	case "pnpm":
-		return `# Install pnpm
-RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g pnpm`
-	case "npm":
-		return "" // npm comes with Node
+	case "yarn", "pnpm":
+		return bs
 	default:
 		return ""
 	}
 }
 
 func installPythonBuildSystem(bs, version string) string {
+	req := pythonBuildSystemRequirement(bs, version)
+	if req == "" {
+		return ""
+	}
+	title := buildSystemTitle(bs)
+	if version != "" {
+		title += " " + version
+	}
+	return fmt.Sprintf(`# Install %s
+RUN eval "$(~/.local/bin/mise activate bash)" && pip install %s`, title, req)
+}
+
+// pythonBuildSystemRequirement returns the pip requirement for a Python build
+// system, pinned when a version is given, or "" when none is needed (pip
+// ships with Python).
+func pythonBuildSystemRequirement(bs, version string) string {
 	switch bs {
-	case "poetry":
+	case "poetry", "pipenv", "uv":
 		if version != "" {
-			return fmt.Sprintf(`# Install Poetry %s
-RUN eval "$(~/.local/bin/mise activate bash)" && pip install poetry==%s`, version, version)
+			return bs + "==" + version
 		}
-		return `# Install Poetry
-RUN eval "$(~/.local/bin/mise activate bash)" && pip install poetry`
-	case "pipenv":
-		return `# Install Pipenv
-RUN eval "$(~/.local/bin/mise activate bash)" && pip install pipenv`
-	case "uv":
-		if version != "" {
-			return fmt.Sprintf(`# Install uv %s
-RUN eval "$(~/.local/bin/mise activate bash)" && pip install uv==%s`, version, version)
-		}
-		return `# Install uv
-RUN eval "$(~/.local/bin/mise activate bash)" && pip install uv`
-	case "pip":
-		return "" // pip comes with Python
+		return bs
 	default:
 		return ""
 	}
@@ -216,14 +227,32 @@ RUN bash -c "source ~/.sdkman/bin/sdkman-init.sh && sdk install ant"`
 }
 
 func installRubyBuildSystem(bs string) string {
-	switch bs {
-	case "bundler":
-		return `# Install Bundler
-RUN eval "$(~/.local/bin/mise activate bash)" && gem install bundler`
-	case "gem":
-		return "" // gem comes with Ruby
-	default:
+	gem := rubyBuildSystemGem(bs)
+	if gem == "" {
 		return ""
+	}
+	return fmt.Sprintf(`# Install %s
+RUN eval "$(~/.local/bin/mise activate bash)" && gem install %s`, buildSystemTitle(bs), gem)
+}
+
+// rubyBuildSystemGem returns the gem providing a Ruby build system, or ""
+// when none is needed (gem ships with Ruby).
+func rubyBuildSystemGem(bs string) string {
+	if bs == "bundler" {
+		return bs
+	}
+	return ""
+}
+
+// buildSystemTitle is the display name of a build system in Dockerfile comments.
+func buildSystemTitle(bs string) string {
+	switch bs {
+	case "uv":
+		return "uv"
+	case "pnpm":
+		return "pnpm"
+	default:
+		return strings.ToUpper(bs[:1]) + bs[1:]
 	}
 }
 

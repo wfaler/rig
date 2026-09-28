@@ -59,7 +59,7 @@ RUN mkdir -p /etc/apt/keyrings \
 
 {{ if .CodeServer }}
 # Install code-server (VS Code in browser)
-RUN curl -fsSL https://code-server.dev/install.sh | sh
+RUN {{ .CodeServerInstall }}
 {{ end }}
 
 # Create non-root user for development
@@ -147,7 +147,7 @@ RUN mise use --global node@lts
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
 # Install other AI agents via npm
-RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g @google/gemini-cli openai
+RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g {{ .AgentNPMPackages }}
 
 {{ if .Herdr }}
 # Install the herdr CLI (static binary) so a containerized agent can drive the
@@ -155,13 +155,13 @@ RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g @google/gemini-c
 # asset names.
 USER root
 RUN HERDR_ARCH="$(uname -m)" \
-    && curl -fsSL "https://github.com/herdrdev/herdr/releases/latest/download/herdr-linux-${HERDR_ARCH}" -o /usr/local/bin/herdr \
+    && curl -fsSL "{{ .HerdrBinaryURL }}" -o /usr/local/bin/herdr \
     && chmod 755 /usr/local/bin/herdr
 USER developer
 
 # Install the herdr agent skill so Claude Code auto-discovers it
 RUN mkdir -p /home/developer/.claude/skills/herdr \
-    && curl -fsSL https://raw.githubusercontent.com/herdrdev/herdr/master/skills/herdr/SKILL.md \
+    && curl -fsSL {{ .HerdrSkillURL }} \
        -o /home/developer/.claude/skills/herdr/SKILL.md
 
 # Install the rig sandbox skill so in-container agents spawn new herdr panes
@@ -176,7 +176,7 @@ USER developer
 
 {{ if .MarkdownServer }}
 # Install marked (markdown parser) for markdown server
-RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g marked@latest
+RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g {{ .MarkdownNPMPackage }}
 
 # Configure markdown server port
 ENV RIG_MD_PORT={{ .MarkdownServerPort }}
@@ -207,6 +207,13 @@ RUN mkdir -p /home/developer/.local/share/code-server/User \
 RUN {{ range $i, $ext := .CodeServerExtensions }}{{ if $i }} && {{ end }}code-server --install-extension {{ $ext }}{{ end }}
 {{ end }}
 {{ end }}
+
+# Install the update script, which refreshes the toolchain and AI agents in a
+# running container without rebuilding the image
+USER root
+COPY rig-update {{ .UpdateScriptPath }}
+RUN chmod 755 {{ .UpdateScriptPath }}
+USER developer
 
 WORKDIR /workspace
 

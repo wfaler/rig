@@ -44,8 +44,11 @@ type DockerClient interface {
 	// IsContainerRunning checks if a container is currently running
 	IsContainerRunning(ctx context.Context, containerID string) (bool, error)
 
-	// GetContainerImage returns the image reference used by a container
-	GetContainerImage(ctx context.Context, containerID string) (string, error)
+	// ImageID returns the ID of the image with the given ref
+	ImageID(ctx context.Context, imageRef string) (string, error)
+
+	// GetContainerImageID returns the ID of the image a container was created from
+	GetContainerImageID(ctx context.Context, containerID string) (string, error)
 
 	// GetHerdrSocketHostPath returns the host source path of the herdr socket
 	// bind mount for a container, or "" if the container has no such mount.

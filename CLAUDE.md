@@ -30,6 +30,7 @@ internal/project/       # Project-level utilities (naming, hashing)
 Key patterns:
 - Dockerfile content is generated from Go templates (`BaseTemplate` in `template.go`)
 - JS/CSS for the markdown server lives in `internal/dockerfile/scripts/` as standalone files, embedded into the binary via `//go:embed` (see `embed.go`)
+- The in-container `rig-update` script is generated per config from `scripts/rig-update.sh.tmpl` (see `update.go`). Install commands used by both the Dockerfile and the script are shared constants/functions in `update.go` and `languages.go`, so a new tool added to the image should get an update step too
 - Extra files (like `rig-md-server.js`) are added to the Docker build context via `BuildContext.ExtraFiles` and `COPY`'d into the image
 - Config is parsed from `.rig.yml` with sensible defaults (markdown server enabled by default, zsh shell, etc.)
 

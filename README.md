@@ -80,7 +80,9 @@ Dev Containers assume you're opening your project in VS Code. Rig assumes you mi
 | `rig destroy [name]` | Stop container and remove all images |
 | `rig list` | List running rig containers |
 | `rig init` | Create `.rig.yml` template |
-| `rig rebuild` | Force clean rebuild of image |
+| `rig rebuild` | Remove the container and all of the project's images, then build a fresh image |
+
+Inside a container, `rig-update` updates the toolchain and AI agents without a rebuild (see [Updating Tools Without Rebuilding](#updating-tools-without-rebuilding)).
 
 ## Configuration
 
@@ -223,6 +225,25 @@ On **Linux**, the herdr socket is bind-mounted directly — unix sockets work ac
 
 On **macOS**, unix sockets cannot cross the Docker VM boundary (the bind-mounted file appears, but connecting to it fails — true of OrbStack and Docker Desktop alike). Rig bridges instead: the host `rig up` process listens on a deterministic loopback TCP port and forwards to the socket, while `socat` inside the container re-exposes it at `/run/herdr/herdr.sock`. This is automatic; the only visible difference is that in-container herdr access requires a `rig up` session to be attached (which is the only time it's meaningful anyway).
 
+## Updating Tools Without Rebuilding
+
+Every image ships a `rig-update` script, generated from your `.rig.yml`, that updates the toolchain and AI agents inside a running container:
+
+```bash
+# Inside the rig container
+rig-update              # run every step
+rig-update --list       # show the steps this container has
+rig-update claude npm   # run only some steps
+```
+
+It covers Debian packages (including the Docker and GitHub CLIs), mise and its runtimes, SDKMAN, Claude Code, the npm-installed agents, your build systems, herdr, code-server and Oh My Zsh, depending on what your config enables. Steps run in dependency order, so packages installed into a runtime are reinstalled after that runtime is upgraded. A failing step doesn't stop the others; the summary names the failed steps and how to re-run them.
+
+Pinned versions are respected: a runtime pinned to `1.22` only moves within `1.22.x`, and a build system pinned to an exact version stays there. Java itself is never upgraded, because it's always pinned.
+
+Images built by older rig versions don't include `rig-update`. Run `rig rebuild` once in each project to add it; changing only the rig binary doesn't trigger a rebuild, because the image tag comes from `.rig.yml` alone.
+
+Updates live in the container, not the image. They survive `rig down` / `rig up`, but not a recreation (after a `.rig.yml` change or `rig rebuild`), which starts again from the image. Services started with the container, such as the documentation server and code-server, keep running their old versions until the container restarts.
+
 ## What's Inside
 
 Every rig container includes:
@@ -234,19 +255,21 @@ Every rig container includes:
 - **Docker CLI**: For testcontainers and Docker workflows
 - **Version Managers**: Mise (polyglot) and SDKMAN (JVM)
 - **Shell**: Zsh with Oh My Zsh (default), bash, or fish
+- **`rig-update`**: Updates all of the above in place, without rebuilding the image
 
 ## How It Works
 
 ```mermaid
 graph LR
-    A[.rig.yml] -->|hash| B[Build Image]
-    B --> C[Create Container]
-    C --> D[rig up]
-    D --> E{Container exists?}
-    E -->|Yes| F[Attach Shell]
-    E -->|No| C
-    G[Config Changed?] -->|Yes| B
-    G -->|No| F
+    A[rig up] --> B{Image for this .rig.yml hash exists?}
+    B -->|No| C[Build image]
+    B -->|Yes| D{Container exists?}
+    C --> D
+    D -->|No| F[Create container]
+    D -->|Yes| E{Create-time settings match?}
+    E -->|Yes| G[Start if stopped, attach shell]
+    E -->|No| H[Remove container] --> F
+    F --> G
 ```
 
 1. **Config Hash** — Your `.rig.yml` is hashed to create a unique image tag
@@ -254,6 +277,25 @@ graph LR
 3. **Persistent Containers** — Named `rig-<project>`, reused across sessions
 4. **Socket Mounting** — The container engine socket is mounted for testcontainers support
 5. **Entrypoint Magic** — Permissions and services configured at container start
+
+### When is the container recreated?
+
+Some settings are fixed when a container is created, so `rig up` recreates the container when any of them differ from what the current session needs:
+
+- **Image**: `.rig.yml` changed, or the image was rebuilt. Rig compares image IDs, not names, so an engine reporting names differently (Podman shows `rig-foo:tag` as `docker.io/library/rig-foo:tag`) does not count as a change.
+- **Engine socket**: you switched engines, or the socket moved.
+- **herdr wiring**: you started rig inside or outside herdr, or the socket or bridge port changed.
+- **User namespace mode**: for example, moving between rootless Podman and Docker.
+
+`rig up` always tells you whether it built an image and why it's replacing a container:
+
+```
+Using existing image rig-myapp:e2af40132020 (.rig.yml unchanged since it was built)
+Recreating container rig-myapp, as its create-time settings changed:
+  - engine socket: /var/run/docker.sock -> /run/user/1000/podman/podman.sock
+```
+
+Recreating a container discards anything changed inside it outside `/workspace`, including updates made with [`rig-update`](#updating-tools-without-rebuilding).
 
 ### Docker and Podman
 
@@ -277,6 +319,8 @@ For Docker-in-Docker (testcontainers), rig bind-mounts the engine socket at `/va
 `DOCKER_HOST` wins when it points at a unix socket rig can reach. On Linux, candidates that cannot be reached are skipped — under rootless Podman, `/var/run/docker.sock` is often a symlink to the root-owned `/run/podman/podman.sock`, and mounting it fails container creation with `statfs /var/run/docker.sock: permission denied`. On macOS the engine runs in a VM with its own filesystem, so the conventional in-VM path is used.
 
 If no socket can be reached, rig still starts the container and prints a note — everything works except testcontainers and the in-container `docker` CLI. Switching engines changes the mount, so rig recreates the container automatically on the next `rig up`.
+
+Podman lists locally built images under qualified names (`docker.io/library/rig-foo`, or `localhost/rig-foo`). Rig handles this: it checks whether an existing container is up to date by image ID, and `rig rebuild` and `rig destroy` clean up images under any of these names.
 
 ### Security: No Privileged Mode
 
