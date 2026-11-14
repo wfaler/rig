@@ -37,14 +37,14 @@ Read the following to understand what the code is supposed to do:
 
 - PRD says feature X behaves a certain way — does the code match?
 - ADR decisions — is the chosen approach actually followed in code? (e.g., ADR-0001 says use MiniSearch — is it actually MiniSearch?)
-- Configuration defaults — do they match what the PRD specifies? (e.g., markdown server enabled by default on port 3030)
+- Configuration defaults — do they match what the PRD specifies? (e.g., markdown server disabled by default, port 3030 when enabled)
 - Lifecycle behaviour — does `rig up` actually check image hash, rebuild if needed, reuse existing container? Does `rig destroy` actually remove images?
 - The `go:embed` pipeline — does `GetMarkdownServerScript()` correctly inject CSS and client JS? Are the `RIG_INJECTED_*` placeholders fully resolved?
 
 ### 2. Logic and Correctness
 
 - Off-by-one errors in config hash truncation (first 12 chars of SHA256)
-- Inverted boolean conditions in `IsMarkdownServerEnabled()`, `IsCodeServerEnabled()` — especially the nil-means-enabled default for markdown server
+- Inverted boolean conditions in `IsMarkdownServerEnabled()`, `IsCodeServerEnabled()` — especially nil-means-disabled for markdown server vs nil-means-enabled for herdr
 - Port conflict detection — does `GetAllPorts()` correctly deduplicate when a port appears in both explicit config and auto-added service ports?
 - URL encoding in the markdown server — path components with `/` encoded as `%2F`, `decodeURIComponent` matching (this has caused bugs before)
 - Template rendering — does `BaseTemplate` correctly handle all conditional branches? What happens with empty language maps?

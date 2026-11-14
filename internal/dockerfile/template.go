@@ -94,8 +94,20 @@ RUN printf '%s\n' '#!/bin/bash' \
     '  sudo chown developer /run/herdr' \
     '  (socat UNIX-LISTEN:{{ .HerdrSocketPath }},fork,unlink-early,mode=666 TCP:host.docker.internal:${RIG_HERDR_PROXY_PORT} > /tmp/herdr-proxy.log 2>&1 &)' \
     'fi' \
-{{ end }}
-    '# Start code-server in background if installed' \
+{{ end }}{{ if .PersistClaudeState }}    '# Keep Claude Code per-project state (auto-memory, session transcripts) in' \
+    '# the workspace so it survives container recreation. The .gitignore keeps' \
+    '# it out of version control, as transcripts can contain secrets.' \
+    'if mkdir -p {{ .ClaudeStateDir }}/projects 2>/dev/null; then' \
+    '  [ -f {{ .RigStateDir }}/.gitignore ] || echo "*" > {{ .RigStateDir }}/.gitignore' \
+    '  mkdir -p /home/developer/.claude' \
+    '  if [ -d /home/developer/.claude/projects ] && [ ! -L /home/developer/.claude/projects ]; then' \
+    '    cp -an /home/developer/.claude/projects/. {{ .ClaudeStateDir }}/projects/ && rm -rf /home/developer/.claude/projects' \
+    '  fi' \
+    '  if [ ! -e /home/developer/.claude/projects ] || [ -L /home/developer/.claude/projects ]; then' \
+    '    ln -sfn {{ .ClaudeStateDir }}/projects /home/developer/.claude/projects' \
+    '  fi' \
+    'fi' \
+{{ end }}    '# Start code-server in background if installed' \
     'if command -v code-server > /dev/null 2>&1; then' \
     '  code-server --bind-addr 0.0.0.0:${CODE_SERVER_PORT:-8080} --auth none > /tmp/code-server.log 2>&1 &' \
     '  echo "code-server started on http://localhost:${CODE_SERVER_PORT:-8080}"' \
@@ -155,8 +167,8 @@ RUN eval "$(~/.local/bin/mise activate bash)" && npm install -g {{ .AgentNPMPack
 # asset names.
 USER root
 RUN HERDR_ARCH="$(uname -m)" \
-    && curl -fsSL "{{ .HerdrBinaryURL }}" -o /usr/local/bin/herdr \
-    && chmod 755 /usr/local/bin/herdr
+    && curl -fsSL "{{ .HerdrBinaryURL }}" -o {{ .HerdrBinPath }} \
+    && chmod 755 {{ .HerdrBinPath }}
 USER developer
 
 # Install the herdr agent skill so Claude Code auto-discovers it
@@ -170,9 +182,37 @@ USER root
 COPY rig-sandbox-skill.md /home/developer/.claude/skills/rig-sandbox/SKILL.md
 RUN chown -R developer:developer /home/developer/.claude/skills/rig-sandbox
 USER developer
+
+# Install rig's Claude Code hook that keeps herdr showing the pane as working
+# while background tasks (shells, subagents, monitors) outlive Claude's turn
+USER root
+COPY rig-herdr-claude-hook.sh {{ .HerdrClaudeHookPath }}
+RUN chmod 755 {{ .HerdrClaudeHookPath }}
+USER developer
+RUN {{ .HerdrClaudeHookInstall }}
 {{ end }}
 
 {{ .BuildSystemInstalls }}
+
+{{ if .Neovim }}
+# Install Neovim via Mise, so rig-update upgrades it with the runtimes
+RUN {{ .NeovimInstall }}
+
+# Make vi and vim open Neovim, for scripts and git as well as the shell
+USER root
+RUN {{ .NeovimAliases }}
+USER developer
+{{ if .NeovimConfigClone }}
+# Install the Neovim config from .rig.yml and pre-initialise it: plugins, the
+# Mason tools for the configured languages, and treesitter parsers
+USER root
+COPY rig-nvim-init.lua {{ .NvimInitScriptPath }}
+RUN chmod 644 {{ .NvimInitScriptPath }}
+USER developer
+RUN {{ .NeovimConfigClone }} \
+    && {{ .NeovimSetup }}
+{{ end }}
+{{ end }}
 
 {{ if .MarkdownServer }}
 # Install marked (markdown parser) for markdown server

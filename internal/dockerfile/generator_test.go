@@ -239,14 +239,27 @@ func TestGenerateWithMarkdownServer(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name: "markdown server enabled by default",
+			name: "markdown server disabled by default",
 			config: &config.Config{
 				Languages: map[string]config.LanguageConfig{},
 				Env:       map[string]string{},
 			},
+			wantNotContain: []string{
+				"npm install -g marked",
+				"COPY rig-md-server.js",
+				"ENV RIG_MD_PORT",
+			},
+		},
+		{
+			name: "markdown server enabled uses default port",
+			config: &config.Config{
+				Languages:      map[string]config.LanguageConfig{},
+				Env:            map[string]string{},
+				MarkdownServer: &config.MarkdownServerConfig{Enabled: true},
+			},
 			wantContains: []string{
 				"npm install -g marked@latest",
-				"rig-md-server.js",
+				"COPY rig-md-server.js",
 				"RIG_MD_PORT=3030",
 			},
 		},
@@ -434,6 +447,8 @@ func TestGenerateHerdr(t *testing.T) {
 		"RIG_HERDR_PROXY_PORT",
 		"rig-sandbox-skill.md",
 		"skills/rig-sandbox/SKILL.md",
+		"COPY rig-herdr-claude-hook.sh " + HerdrClaudeHookPath,
+		"RUN " + HerdrClaudeHookPath + " install",
 	}
 
 	t.Run("enabled by default", func(t *testing.T) {
@@ -448,6 +463,7 @@ func TestGenerateHerdr(t *testing.T) {
 		}
 		assert.Contains(t, buildCtx.ExtraFiles, "rig-sandbox-skill.md")
 		assert.Contains(t, string(buildCtx.ExtraFiles["rig-sandbox-skill.md"]), "RIG_HOST_WORKDIR")
+		assert.Equal(t, herdrClaudeHook, string(buildCtx.ExtraFiles[herdrClaudeHookFile]))
 	})
 
 	t.Run("explicitly enabled", func(t *testing.T) {
@@ -475,10 +491,51 @@ func TestGenerateHerdr(t *testing.T) {
 			assert.NotContains(t, buildCtx.Dockerfile, m, "disabled config must not install herdr: %s", m)
 		}
 		assert.NotContains(t, buildCtx.ExtraFiles, "rig-sandbox-skill.md")
+		assert.NotContains(t, buildCtx.ExtraFiles, herdrClaudeHookFile)
 		// Structural invariants still hold.
 		assert.True(t, strings.HasPrefix(buildCtx.Dockerfile, "FROM "))
 		assert.Contains(t, buildCtx.Dockerfile, "CMD [")
 	})
+}
+
+func TestGenerateClaudeStatePersistence(t *testing.T) {
+	enabled := true
+	disabled := false
+
+	markers := []string{
+		"mkdir -p /workspace/.rig/claude/projects",
+		`echo "*" > /workspace/.rig/.gitignore`,
+		"ln -sfn /workspace/.rig/claude/projects /home/developer/.claude/projects",
+	}
+
+	tests := []struct {
+		name    string
+		claude  *config.ClaudeConfig
+		persist bool
+	}{
+		{"enabled by default", nil, true},
+		{"explicitly enabled", &config.ClaudeConfig{PersistState: &enabled}, true},
+		{"explicitly disabled", &config.ClaudeConfig{PersistState: &disabled}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &config.Config{
+				Languages: map[string]config.LanguageConfig{},
+				Env:       map[string]string{},
+				Claude:    tt.claude,
+			}
+			buildCtx, err := Generate(cfg)
+			require.NoError(t, err)
+			for _, m := range markers {
+				if tt.persist {
+					assert.Contains(t, buildCtx.Dockerfile, m)
+				} else {
+					assert.NotContains(t, buildCtx.Dockerfile, m)
+				}
+			}
+			assert.Contains(t, buildCtx.Dockerfile, `'exec "$@"' > /usr/local/bin/docker-entrypoint.sh`)
+		})
+	}
 }
 
 func TestGenerateIncludesUpdateScript(t *testing.T) {
@@ -512,13 +569,16 @@ func TestGenerateIncludesUpdateScript(t *testing.T) {
 // TestDockerfileAndUpdateScriptShareSources guards against the two drifting
 // apart: an update must refresh exactly what the image installed.
 func TestDockerfileAndUpdateScriptShareSources(t *testing.T) {
-	cfg := &config.Config{CodeServer: &config.CodeServerConfig{Enabled: true}}
+	cfg := &config.Config{
+		CodeServer:     &config.CodeServerConfig{Enabled: true},
+		MarkdownServer: &config.MarkdownServerConfig{Enabled: true},
+	}
 	buildCtx, err := Generate(cfg)
 	require.NoError(t, err)
 	script, err := GenerateUpdateScript(cfg)
 	require.NoError(t, err)
 
-	for _, shared := range []string{agentNPMPackages, markdownNPMPackage, herdrBinaryURL, herdrSkillURL, codeServerInstall} {
+	for _, shared := range []string{agentNPMPackages, markdownNPMPackage, herdrBinaryURL, herdrSkillURL, herdrClaudeHookInstall, codeServerInstall} {
 		assert.Contains(t, buildCtx.Dockerfile, shared)
 		assert.Contains(t, script, shared)
 	}

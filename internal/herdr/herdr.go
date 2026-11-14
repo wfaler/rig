@@ -17,6 +17,7 @@ const (
 	EnvWorkspaceID = "HERDR_WORKSPACE_ID" // current workspace identifier
 	EnvTabID       = "HERDR_TAB_ID"       // current tab identifier
 	EnvAgent       = "HERDR_AGENT"        // agent manifest herdr should use for detection
+	EnvBinPath     = "HERDR_BIN_PATH"     // herdr CLI that integrations should call
 )
 
 // reexecSentinel guards against an infinite re-exec loop when rig re-launches
@@ -27,6 +28,10 @@ const reexecSentinel = "RIG_HERDR_REEXEC"
 // to inside the container. Using a stable path keeps HERDR_SOCKET_PATH
 // consistent regardless of where the socket lives on the host.
 const ContainerSocketPath = "/run/herdr/herdr.sock"
+
+// ContainerBinPath is where the image installs the herdr CLI. It replaces the
+// host's HERDR_BIN_PATH, which names a binary that is not in the container.
+const ContainerBinPath = "/usr/local/bin/herdr"
 
 // Info holds the herdr context detected from the environment.
 type Info struct {
@@ -72,6 +77,7 @@ func (i Info) ContainerEnv(agent string) map[string]string {
 	env := map[string]string{
 		EnvActive:     "1",
 		EnvSocketPath: ContainerSocketPath,
+		EnvBinPath:    ContainerBinPath,
 		EnvAgent:      agent,
 	}
 	if i.PaneID != "" {

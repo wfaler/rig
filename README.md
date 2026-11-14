@@ -116,13 +116,19 @@ env:
 shell: zsh  # zsh with oh-my-zsh (default), bash, or fish
 
 markdown_server:
-  port: 3030             # enabled by default
+  enabled: true          # off by default
+  port: 3030
 
 code_server:
   enabled: true
   theme: "Default Dark Modern"
   extensions:
     - github.copilot
+
+neovim:
+  config:
+    repo: https://github.com/you/dotfiles.git
+    path: .config/nvim
 ```
 
 ### Supported Languages
@@ -149,23 +155,20 @@ No additional configuration needed — `host.docker.internal` is available in ev
 
 ## Documentation Server
 
-Every rig container includes a built-in markdown server that renders your project's `.md` files as navigable HTML. Access it at `http://localhost:3030`.
+Rig can run a built-in markdown server that renders your project's `.md` files as navigable HTML. It is off by default; enable it and open `http://localhost:3030`.
 
 - **Live-reload** — Edit markdown in your editor, see changes instantly in the browser
 - **File navigation** — Collapsible directory tree sidebar
 - **Mermaid diagrams** — Fenced `mermaid` code blocks render as diagrams
 - **Light/dark theme** — Toggle with persistent preference
-- **Zero config** — Enabled by default, just open the URL
 
 ```yaml
-# Optional: change the port
 markdown_server:
-  port: 4040
-
-# Or disable it
-markdown_server:
-  enabled: false
+  enabled: true
+  port: 4040             # optional, default: 3030
 ```
+
+Setting only `port` does not enable it; `enabled: true` is required.
 
 ## Code Server (VS Code in Browser)
 
@@ -184,6 +187,35 @@ code_server:
 
 Run `rig init` to see recommended extensions for each language.
 
+## Neovim
+
+Every rig container has the latest Neovim, installed through mise, and `vi` and `vim` open it. They are small wrappers in `/usr/local/bin` rather than shell aliases, so they also work for scripts, `git commit` and `sudo vim`; Debian's Vim is still available as `/usr/bin/vim`.
+
+Point rig at your config and it is baked into the image, ready on first launch:
+
+```yaml
+neovim:
+  config:
+    repo: https://github.com/you/dotfiles.git  # https git URL
+    path: .config/nvim                         # optional: directory in the repo
+    ref: main                                  # optional: branch or tag
+```
+
+At build time rig clones the repository (only `path`, via a sparse checkout), links it to `~/.config/nvim`, and pre-initialises it in headless Neovim:
+
+- **Plugins** — lazy.nvim plugins at the versions in your `lazy-lock.json`. A plugin that fails to install fails the build.
+- **Mason tools** — the packages in an NvChad config's `mason.pkgs`, filtered to the project's languages using Mason's own language metadata, so a Go project gets `gopls` and `goimports` but not `jdtls`. Tools that serve no particular language (such as `tree-sitter-cli`) and Lua tools (for editing the config) are always installed. Failures are reported and skipped.
+- **Treesitter parsers** — the parsers your config installs on startup (nvim-treesitter `main` branch) are built and waited for.
+
+Steps that don't apply to your config (no lazy.nvim, no Mason list) are skipped. The repository is cloned without credentials, so it must be public. `rig-update neovim` pulls the config and re-runs the same steps, moving plugins to your updated `lazy-lock.json`.
+
+Without `config`, Neovim runs with its defaults. To leave it out entirely:
+
+```yaml
+neovim:
+  enabled: false
+```
+
 ## Running Inside herdr
 
 [herdr](https://herdr.dev) is a terminal multiplexer for AI coding agents. When you run `rig up` inside a herdr-managed pane, rig wires the containerized agent into herdr automatically:
@@ -191,6 +223,7 @@ Run `rig init` to see recommended extensions for each language.
 - **Agent detection** — rig sets `HERDR_AGENT` (default `claude`) on itself so herdr can detect the agent through the container. It does this by re-executing with the variable set, since herdr reads it from the foreground process.
 - **Socket access** — herdr's control socket is reachable inside the container at `/run/herdr/herdr.sock`, and `HERDR_SOCKET_PATH`, `HERDR_ENV`, and the pane/workspace/tab IDs are injected into your shell. So `herdr pane current`, `herdr pane split`, etc. work from inside the sandbox exactly as they do on the host.
 - **CLI + skills** — the herdr CLI (single static binary), the herdr agent skill, and rig's own `rig-sandbox` skill are baked into the image, so an agent like Claude Code can spawn and monitor other agents over the socket API.
+- **Background work status** — herdr reads Claude Code's state from the screen, so once a turn ends it shows the pane as idle even while background shells, subagents, monitors or workflows are still running. Rig installs a Claude Code hook that tells herdr the pane is still working, with a count such as `2 background tasks (shell, subagent)`, until that work is done. See [below](#background-work-status).
 
 This is enabled by default and only activates when herdr is present. Configure or disable it in `.rig.yml`:
 
@@ -219,6 +252,19 @@ herdr pane run <pane_id> "make test"    # runs inside the sandbox
 
 The same `--cwd` joins the same project container (shared filesystem, separate shell); a different project's host directory gets that project's own container.
 
+### Background work status
+
+Claude Code's `Stop` hook lists the background work still in flight when a turn ends. Rig's hook, at `/usr/local/share/rig/rig-herdr-claude-hook.sh`, is registered in the container's `~/.claude/settings.json`:
+
+- **On `Stop`** — with background work in flight, it reports the pane as `working` to herdr, which takes precedence over herdr's screen detection. With none, it hands the pane back.
+- **On `UserPromptSubmit`, `StopFailure`, `SessionEnd`, and permission or MCP input prompts** — it hands the pane back to screen detection, which already handles turns, prompts and interrupts correctly.
+
+When background work finishes, Claude Code is woken to handle its result, and the `Stop` at the end of that turn updates the status. Two cases are not tracked: a background task you stop from `/tasks` while Claude is idle leaves the pane showing `working` until your next prompt, and a permission prompt raised by a background subagent while the main turn is idle may show as `working` rather than `blocked` for its first few seconds.
+
+The hook adds its entries alongside any hooks of your own and does nothing outside herdr. It needs an image built by this version of rig; run `rig rebuild` once to add it to an existing project.
+
+rig does not install herdr's own Claude integration (`herdr integration install claude`). It only reports the session ID so herdr can resume Claude after a herdr restart, and that resume would run `claude --resume` in a host pane, outside the container.
+
 ### How the socket reaches the container
 
 On **Linux**, the herdr socket is bind-mounted directly — unix sockets work across bind mounts when host and container share a kernel.
@@ -236,7 +282,7 @@ rig-update --list       # show the steps this container has
 rig-update claude npm   # run only some steps
 ```
 
-It covers Debian packages (including the Docker and GitHub CLIs), mise and its runtimes, SDKMAN, Claude Code, the npm-installed agents, your build systems, herdr, code-server and Oh My Zsh, depending on what your config enables. Steps run in dependency order, so packages installed into a runtime are reinstalled after that runtime is upgraded. A failing step doesn't stop the others; the summary names the failed steps and how to re-run them.
+It covers Debian packages (including the Docker and GitHub CLIs), mise and its runtimes (including Neovim), SDKMAN, Claude Code, the npm-installed agents, your build systems, your Neovim config and its plugins and tools, herdr (re-registering rig's Claude Code status hook), code-server and Oh My Zsh, depending on what your config enables. Steps run in dependency order, so packages installed into a runtime are reinstalled after that runtime is upgraded. A failing step doesn't stop the others; the summary names the failed steps and how to re-run them.
 
 Pinned versions are respected: a runtime pinned to `1.22` only moves within `1.22.x`, and a build system pinned to an exact version stays there. Java itself is never upgraded, because it's always pinned.
 
@@ -244,13 +290,29 @@ Images built by older rig versions don't include `rig-update`. Run `rig rebuild`
 
 Updates live in the container, not the image. They survive `rig down` / `rig up`, but not a recreation (after a `.rig.yml` change or `rig rebuild`), which starts again from the image. Services started with the container, such as the documentation server and code-server, keep running their old versions until the container restarts.
 
+## Claude Code Memory and Sessions
+
+Claude Code keeps per-project state — its auto-memory and the session transcripts `claude --resume` uses — under `~/.claude/projects`, which lives in the container and would be lost whenever the container is recreated. Rig links that directory to `.rig/claude/projects` in your project instead, so Claude's continuity survives `.rig.yml` changes and `rig rebuild`.
+
+- `.rig/` contains a `.gitignore` of `*`, so it stays out of version control without touching your own `.gitignore`. Transcripts record everything said in a session, so don't commit them.
+- Only `projects/` is linked. Credentials stay in the container, so you may need to log in again after a recreation.
+- State already in the container is moved into `.rig/` the first time the link is made.
+
+This is enabled by default. To keep the state in the container only:
+
+```yaml
+claude:
+  persist_state: false
+```
+
 ## What's Inside
 
 Every rig container includes:
 
 - **AI Assistants**: Claude Code, Gemini CLI, OpenAI CLI, GitHub CLI
 - **herdr Integration**: herdr CLI + agent skills for orchestrating agents and spawning sandboxed sessions from inside a herdr pane
-- **Documentation Server**: Live-reload markdown renderer with mermaid support
+- **Documentation Server** (optional): Live-reload markdown renderer with mermaid support
+- **Neovim**: Latest release, optionally with your config pre-initialised
 - **Dev Tools**: git, curl, wget, jq, vim, tmux, build-essential
 - **Docker CLI**: For testcontainers and Docker workflows
 - **Version Managers**: Mise (polyglot) and SDKMAN (JVM)

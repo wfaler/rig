@@ -17,6 +17,12 @@ var markdownCSS string
 //go:embed scripts/rig-sandbox-skill.md
 var rigSandboxSkill string
 
+//go:embed scripts/rig-herdr-claude-hook.sh
+var herdrClaudeHook string
+
+//go:embed scripts/rig-nvim-init.lua
+var nvimInitScript string
+
 //go:embed scripts/rig-update.sh.tmpl
 var updateScriptTemplate string
 

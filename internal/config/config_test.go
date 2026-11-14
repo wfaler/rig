@@ -2,11 +2,15 @@ package config
 
 import (
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"pgregory.net/rapid"
 )
+
+func boolPtr(b bool) *bool { return &b }
 
 func TestParse(t *testing.T) {
 	tests := []struct {
@@ -483,19 +487,25 @@ languages:
 }
 
 func TestMarkdownServerDefaults(t *testing.T) {
-	// Default: enabled with port 3030
-	cfg := &Config{}
-	assert.True(t, cfg.IsMarkdownServerEnabled())
-	assert.Equal(t, 3030, cfg.GetMarkdownServerPort())
-
-	// Explicitly disabled
-	cfg2 := &Config{MarkdownServer: &MarkdownServerConfig{Enabled: false}}
-	assert.False(t, cfg2.IsMarkdownServerEnabled())
-
-	// Custom port
-	cfg3 := &Config{MarkdownServer: &MarkdownServerConfig{Enabled: true, Port: 4040}}
-	assert.True(t, cfg3.IsMarkdownServerEnabled())
-	assert.Equal(t, 4040, cfg3.GetMarkdownServerPort())
+	tests := []struct {
+		name        string
+		mdServer    *MarkdownServerConfig
+		wantEnabled bool
+		wantPort    int
+	}{
+		{"absent defaults to disabled", nil, false, 3030},
+		{"port without enabled stays disabled", &MarkdownServerConfig{Port: 4040}, false, 4040},
+		{"explicitly disabled", &MarkdownServerConfig{Enabled: false}, false, 3030},
+		{"explicitly enabled uses default port", &MarkdownServerConfig{Enabled: true}, true, 3030},
+		{"explicitly enabled with custom port", &MarkdownServerConfig{Enabled: true, Port: 4040}, true, 4040},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{MarkdownServer: tt.mdServer}
+			assert.Equal(t, tt.wantEnabled, cfg.IsMarkdownServerEnabled())
+			assert.Equal(t, tt.wantPort, cfg.GetMarkdownServerPort())
+		})
+	}
 }
 
 func TestParseWithMarkdownServer(t *testing.T) {
@@ -521,21 +531,22 @@ markdown_server:
 }
 
 func TestGetAllPortsIncludesMarkdownServer(t *testing.T) {
-	// Default config (markdown server enabled)
+	// Default config (markdown server disabled)
 	cfg := &Config{
 		Ports: []string{"8080"},
 	}
 	ports := cfg.GetAllPorts()
-	assert.Contains(t, ports, "3030")
+	assert.NotContains(t, ports, "3030")
 	assert.Contains(t, ports, "8080")
 
-	// Markdown server disabled
+	// Markdown server enabled
 	cfg2 := &Config{
 		Ports:          []string{"8080"},
-		MarkdownServer: &MarkdownServerConfig{Enabled: false},
+		MarkdownServer: &MarkdownServerConfig{Enabled: true},
 	}
 	ports2 := cfg2.GetAllPorts()
-	assert.NotContains(t, ports2, "3030")
+	assert.Contains(t, ports2, "3030")
+	assert.Contains(t, ports2, "8080")
 }
 
 func TestValidateMultipleBuildSystems(t *testing.T) {
@@ -642,6 +653,37 @@ herdr:
 	assert.Equal(t, "gemini", cfg.GetHerdrAgent())
 }
 
+func TestIsClaudeStatePersisted(t *testing.T) {
+	enabled := true
+	disabled := false
+	tests := []struct {
+		name     string
+		claude   *ClaudeConfig
+		expected bool
+	}{
+		{"absent defaults to enabled", nil, true},
+		{"present but unset defaults to enabled", &ClaudeConfig{}, true},
+		{"explicitly enabled", &ClaudeConfig{PersistState: &enabled}, true},
+		{"explicitly disabled", &ClaudeConfig{PersistState: &disabled}, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{Claude: tt.claude}
+			assert.Equal(t, tt.expected, cfg.IsClaudeStatePersisted())
+		})
+	}
+}
+
+func TestParseWithClaude(t *testing.T) {
+	yaml := `
+claude:
+  persist_state: false
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	assert.False(t, cfg.IsClaudeStatePersisted())
+}
+
 func TestHerdrAgentValidation(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -666,4 +708,105 @@ func TestHerdrAgentValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestNeovimDefaults(t *testing.T) {
+	repo := &NeovimConfigRepo{Repo: "https://github.com/example/dotfiles.git"}
+	tests := []struct {
+		name        string
+		neovim      *NeovimConfig
+		wantEnabled bool
+		wantRepo    *NeovimConfigRepo
+	}{
+		{"absent: enabled with Neovim's defaults", nil, true, nil},
+		{"enabled unset: enabled", &NeovimConfig{Config: repo}, true, repo},
+		{"explicitly enabled without config", &NeovimConfig{Enabled: boolPtr(true)}, true, nil},
+		{"disabled ignores the config", &NeovimConfig{Enabled: boolPtr(false), Config: repo}, false, nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{Neovim: tt.neovim}
+			assert.Equal(t, tt.wantEnabled, cfg.IsNeovimEnabled())
+			assert.Equal(t, tt.wantRepo, cfg.GetNeovimConfigRepo())
+		})
+	}
+}
+
+func TestParseWithNeovim(t *testing.T) {
+	yaml := `
+neovim:
+  config:
+    repo: https://github.com/wfaler/arch-dotfiles.git
+    path: .config/nvim
+    ref: main
+`
+	cfg, err := Parse([]byte(yaml))
+	require.NoError(t, err)
+	require.NoError(t, cfg.Validate())
+	assert.True(t, cfg.IsNeovimEnabled())
+	assert.Equal(t, &NeovimConfigRepo{
+		Repo: "https://github.com/wfaler/arch-dotfiles.git",
+		Path: ".config/nvim",
+		Ref:  "main",
+	}, cfg.GetNeovimConfigRepo())
+}
+
+func TestNeovimConfigRepoValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		repo    NeovimConfigRepo
+		wantErr string
+	}{
+		{"repo only", NeovimConfigRepo{Repo: "https://github.com/a/b"}, ""},
+		{"repo, path and ref", NeovimConfigRepo{Repo: "https://github.com/a/b.git", Path: ".config/nvim", Ref: "v1.2"}, ""},
+		{"nested ref", NeovimConfigRepo{Repo: "https://github.com/a/b", Ref: "feature/nvim"}, ""},
+		{"empty repo", NeovimConfigRepo{}, "neovim.config.repo"},
+		{"ssh repo", NeovimConfigRepo{Repo: "git@github.com:a/b.git"}, "neovim.config.repo"},
+		{"http repo", NeovimConfigRepo{Repo: "http://github.com/a/b"}, "neovim.config.repo"},
+		{"file repo", NeovimConfigRepo{Repo: "file:///etc"}, "neovim.config.repo"},
+		{"repo with quote", NeovimConfigRepo{Repo: "https://github.com/a/b'; rm -rf /"}, "neovim.config.repo"},
+		{"absolute path", NeovimConfigRepo{Repo: "https://github.com/a/b", Path: "/etc"}, "neovim.config.path"},
+		{"path escaping the repo", NeovimConfigRepo{Repo: "https://github.com/a/b", Path: "nvim/../../x"}, "neovim.config.path"},
+		{"path as an option", NeovimConfigRepo{Repo: "https://github.com/a/b", Path: "--no-cone"}, "neovim.config.path"},
+		{"path with shell syntax", NeovimConfigRepo{Repo: "https://github.com/a/b", Path: "nvim;id"}, "neovim.config.path"},
+		{"ref as an option", NeovimConfigRepo{Repo: "https://github.com/a/b", Ref: "-u"}, "neovim.config.ref"},
+		{"ref with dots", NeovimConfigRepo{Repo: "https://github.com/a/b", Ref: "a..b"}, "neovim.config.ref"},
+		{"ref with shell syntax", NeovimConfigRepo{Repo: "https://github.com/a/b", Ref: "$(id)"}, "neovim.config.ref"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := &Config{Neovim: &NeovimConfig{Config: &tt.repo}}
+			err := cfg.Validate()
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+				return
+			}
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), tt.wantErr)
+		})
+	}
+}
+
+// TestNeovimConfigRepoValidationProperties checks that any path or ref that
+// passes validation is a plain word: no shell syntax, no option, no escape.
+func TestNeovimConfigRepoValidationProperties(t *testing.T) {
+	rapid.Check(t, func(rt *rapid.T) {
+		path := rapid.String().Draw(rt, "path")
+		ref := rapid.String().Draw(rt, "ref")
+		cfg := &Config{Neovim: &NeovimConfig{Config: &NeovimConfigRepo{
+			Repo: "https://github.com/a/b",
+			Path: path,
+			Ref:  ref,
+		}}}
+		if cfg.Validate() != nil {
+			return
+		}
+		assert.NotContains(rt, ref, "..")
+		assert.NotContains(rt, strings.Split(path, "/"), "..", "%q escapes the repository", path)
+		for _, s := range []string{path, ref} {
+			assert.False(rt, strings.HasPrefix(s, "-"), "%q starts with -", s)
+			assert.False(rt, strings.ContainsAny(s, " \t\n'\"`$;&|<>(){}\\*?![]~#"), "%q has shell syntax", s)
+		}
+		assert.False(rt, strings.HasPrefix(path, "/"), "%q is absolute", path)
+	})
 }

@@ -23,7 +23,7 @@ cmd/                    # CLI commands (Cobra). Entry point: main.go
 internal/config/        # YAML config parsing (.rig.yml)
 internal/docker/        # Docker SDK wrapper (image build, container lifecycle)
 internal/dockerfile/    # Dockerfile generation from config
-  scripts/              # Embedded JS/CSS for markdown server (go:embed)
+  scripts/              # Embedded files baked into the image (go:embed): markdown server JS/CSS, rig-update template, Neovim pre-init Lua, herdr status hook for Claude Code
 internal/project/       # Project-level utilities (naming, hashing)
 ```
 
@@ -32,7 +32,7 @@ Key patterns:
 - JS/CSS for the markdown server lives in `internal/dockerfile/scripts/` as standalone files, embedded into the binary via `//go:embed` (see `embed.go`)
 - The in-container `rig-update` script is generated per config from `scripts/rig-update.sh.tmpl` (see `update.go`). Install commands used by both the Dockerfile and the script are shared constants/functions in `update.go` and `languages.go`, so a new tool added to the image should get an update step too
 - Extra files (like `rig-md-server.js`) are added to the Docker build context via `BuildContext.ExtraFiles` and `COPY`'d into the image
-- Config is parsed from `.rig.yml` with sensible defaults (markdown server enabled by default, zsh shell, etc.)
+- Config is parsed from `.rig.yml` with sensible defaults (markdown server disabled by default, zsh shell, etc.)
 
 ## Testing Strategy
 

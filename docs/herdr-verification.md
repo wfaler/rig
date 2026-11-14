@@ -25,6 +25,7 @@ env | grep HERDR | sort
 - `HERDR_ENV=1`
 - `HERDR_SOCKET_PATH=/run/herdr/herdr.sock`  ← remapped in-container path
 - `HERDR_AGENT=claude`                        ← from `.rig.yml` `herdr.agent`
+- `HERDR_BIN_PATH=/usr/local/bin/herdr`       ← in-container CLI, for integrations
 - `HERDR_PANE_ID=…`, `HERDR_WORKSPACE_ID=…`, `HERDR_TAB_ID=…` (whatever herdr set)
 
 ## 2. herdr CLI is installed and on PATH
@@ -103,6 +104,23 @@ pane/agent list on the host, the pane running `rig up` should be detected as the
 
 ---
 
+Confirmed with herdr 0.9.5: `herdr agent explain "$HERDR_PANE_ID"` from inside
+the container reports `agent: claude`.
+
+## 7. Background work keeps the pane "working"
+
+The Claude Code hook is registered and herdr accepts its reports:
+
+```bash
+jq '.hooks | keys' ~/.claude/settings.json
+# expect: Notification, SessionEnd, Stop, StopFailure, UserPromptSubmit
+```
+
+End-to-end: ask Claude to run `sleep 120` in the background and end its turn.
+herdr should keep showing the pane as working, not idle, until the sleep ends
+and Claude handles its result. Without the hook it would turn idle as soon as
+the turn ended.
+
 ## If something fails
 
 | Symptom | Likely cause |
@@ -111,6 +129,7 @@ pane/agent list on the host, the pane running `rig up` should be detected as the
 | `HERDR_AGENT` missing but others present | exec-env injection path issue in `internal/docker/attach.go` |
 | Socket path exists but CLI can't connect | macOS: TCP bridge down — host `rig up` process not running, or socat failed (`/tmp/herdr-proxy.log` in the container). Linux: permissions (entrypoint `chmod`), or host↔container uid mismatch on the socket |
 | `herdr` not on PATH / no skill | image wasn't rebuilt (`rig rebuild`), or `herdr.enabled` is false |
-| Pane not detected as claude in herdr UI | the open item: herdr may not read `HERDR_AGENT` from the foreground `/proc/environ`. Fallback: launch with `HERDR_AGENT=claude rig up` |
+| Pane not detected as claude in herdr UI | Launched outside herdr, or `HERDR_AGENT` overridden. Fallback: launch with `HERDR_AGENT=claude rig up` |
+| Pane turns idle while background tasks run | Image predates the status hook (`rig rebuild`), or the hook entries were removed from `~/.claude/settings.json` (`rig-update herdr` re-adds them). Test by hand: `echo '{"background_tasks":[{"type":"shell"}]}' \| /usr/local/share/rig/rig-herdr-claude-hook.sh stop` |
 
 Rendered nicely at `http://localhost:3031/docs/herdr-verification.md` (markdown server).

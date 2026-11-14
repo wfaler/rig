@@ -77,6 +77,7 @@ func TestContainerEnv(t *testing.T) {
 
 	assert.Equal(t, "1", env[EnvActive])
 	assert.Equal(t, ContainerSocketPath, env[EnvSocketPath], "socket must be remapped to in-container path")
+	assert.Equal(t, ContainerBinPath, env[EnvBinPath], "herdr CLI must point at the in-container binary")
 	assert.Equal(t, "claude", env[EnvAgent], "agent arg overrides detected value")
 	assert.Equal(t, "pane-1", env[EnvPaneID])
 	assert.Equal(t, "ws-1", env[EnvWorkspaceID])

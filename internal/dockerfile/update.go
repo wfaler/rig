@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/wfaler/rig/internal/config"
+	"github.com/wfaler/rig/internal/herdr"
 )
 
 // Install commands shared by the Dockerfile and the update script, so that an
@@ -28,6 +29,15 @@ const (
 
 	// codeServerInstall installs, or re-run upgrades, code-server.
 	codeServerInstall = "curl -fsSL https://code-server.dev/install.sh | sh"
+)
+
+// herdrClaudeHookFile is the herdr status hook's name in the build context,
+// and HerdrClaudeHookPath is where it is installed in the image. Its install
+// subcommand registers it in Claude Code's settings.json.
+const (
+	herdrClaudeHookFile    = "rig-herdr-claude-hook.sh"
+	HerdrClaudeHookPath    = "/usr/local/share/rig/rig-herdr-claude-hook.sh"
+	herdrClaudeHookInstall = HerdrClaudeHookPath + " install"
 )
 
 // UpdateScriptPath is where the update script is installed in the image.
@@ -117,17 +127,25 @@ func updateSteps(cfg *config.Config) []updateStep {
 			Body:        "mx gem install " + strings.Join(gems, " "),
 		})
 	}
+	if cfg.GetNeovimConfigRepo() != nil {
+		steps = append(steps, updateStep{
+			Name:        "neovim",
+			Description: "Neovim config, its plugins, Mason tools and treesitter parsers (Neovim itself updates with mise)",
+			Body:        neovimUpdateBody(cfg),
+		})
+	}
 	if cfg.IsHerdrEnabled() {
 		steps = append(steps, updateStep{
 			Name:        "herdr",
-			Description: "herdr CLI and its agent skill",
+			Description: "herdr CLI, its agent skill and rig's Claude Code status hook",
 			Body: `HERDR_ARCH="$(uname -m)" \
     && tmp="$(mktemp)" \
     && trap 'rm -f "$tmp"' EXIT \
     && curl -fsSL "` + herdrBinaryURL + `" -o "$tmp" \
-    && sudo install -m 755 "$tmp" /usr/local/bin/herdr \
+    && sudo install -m 755 "$tmp" ` + herdr.ContainerBinPath + ` \
     && mkdir -p "$HOME/.claude/skills/herdr" \
-    && curl -fsSL ` + herdrSkillURL + ` -o "$HOME/.claude/skills/herdr/SKILL.md"`,
+    && curl -fsSL ` + herdrSkillURL + ` -o "$HOME/.claude/skills/herdr/SKILL.md" \
+    && ` + herdrClaudeHookInstall,
 		})
 	}
 	if cfg.IsCodeServerEnabled() {

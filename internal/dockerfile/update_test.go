@@ -96,17 +96,20 @@ func TestUpdateStepBodies(t *testing.T) {
 		wantNotContain []string
 	}{
 		{
-			name:           "npm reinstalls the agents, without marked when the markdown server is off",
-			config:         &config.Config{MarkdownServer: &config.MarkdownServerConfig{Enabled: false}},
+			name:           "npm reinstalls the agents, without marked when the markdown server is off by default",
+			config:         &config.Config{},
 			step:           "npm",
 			wantContains:   []string{"mx npm install -g " + agentNPMPackages},
 			wantNotContain: []string{"marked"},
 		},
 		{
 			name: "npm adds marked and node build systems in a stable order",
-			config: &config.Config{Languages: map[string]config.LanguageConfig{
-				"node": {BuildSystems: map[string]string{"yarn": "true", "pnpm": "true", "npm": "true"}},
-			}},
+			config: &config.Config{
+				Languages: map[string]config.LanguageConfig{
+					"node": {BuildSystems: map[string]string{"yarn": "true", "pnpm": "true", "npm": "true"}},
+				},
+				MarkdownServer: &config.MarkdownServerConfig{Enabled: true},
+			},
 			step:         "npm",
 			wantContains: []string{"mx npm install -g " + agentNPMPackages + " " + markdownNPMPackage + " pnpm yarn"},
 		},
@@ -155,10 +158,10 @@ func TestUpdateStepBodies(t *testing.T) {
 			},
 		},
 		{
-			name:         "herdr refreshes the binary and the skill from the Dockerfile's sources",
+			name:         "herdr refreshes the binary, the skill and the status hook from the Dockerfile's sources",
 			config:       &config.Config{},
 			step:         "herdr",
-			wantContains: []string{herdrBinaryURL, herdrSkillURL, "sudo install -m 755"},
+			wantContains: []string{herdrBinaryURL, herdrSkillURL, "sudo install -m 755", herdrClaudeHookInstall},
 		},
 	}
 	for _, tt := range tests {
@@ -333,6 +336,10 @@ func TestGenerateUpdateScriptProperties(t *testing.T) {
 				Extensions: rapid.SliceOfN(rapid.StringMatching(`[a-z]+\.[a-z-]+`), 0, 3).Draw(rt, "extensions"),
 			},
 			MarkdownServer: &config.MarkdownServerConfig{Enabled: rapid.Bool().Draw(rt, "markdown")},
+			Neovim:         &config.NeovimConfig{Enabled: boolPtr(rapid.Bool().Draw(rt, "neovim"))},
+		}
+		if rapid.Bool().Draw(rt, "neovimConfig") {
+			cfg.Neovim.Config = testNeovimRepo
 		}
 		langs := make([]string, 0, len(config.BuildSystemsForLanguage))
 		for lang := range config.BuildSystemsForLanguage {
@@ -372,9 +379,16 @@ func TestGenerateUpdateScriptProperties(t *testing.T) {
 			require.Contains(rt, script, "["+s.Name+"]="+s.FuncName())
 			require.NotEmpty(rt, strings.TrimSpace(s.Body), "step %q has an empty body", s.Name)
 		}
-		for _, pkgStep := range []string{"npm", "pip", "gem"} {
+		for _, pkgStep := range []string{"npm", "pip", "gem", "neovim"} {
 			if i, ok := position[pkgStep]; ok {
 				require.Less(rt, position["mise"], i, "mise must run before %s", pkgStep)
+			}
+		}
+		// Mason reinstalls npm- and pip-based tools into the upgraded runtimes.
+		if i, ok := position["neovim"]; ok {
+			require.Less(rt, position["npm"], i, "npm must run before neovim")
+			if pip, ok := position["pip"]; ok {
+				require.Less(rt, pip, i, "pip must run before neovim")
 			}
 		}
 	})

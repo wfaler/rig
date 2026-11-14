@@ -69,9 +69,9 @@ env: {}
 # shell: zsh
 
 # Markdown server (renders .md files as HTML with hot-reload)
-# Enabled by default on port 3030. Serves README.md at root.
+# Disabled by default. Serves README.md at root.
 # markdown_server:
-#   enabled: false                       # set to false to disable
+#   enabled: true                        # set to true to enable
 #   port: 3030                           # default: 3030
 
 # herdr integration (https://herdr.dev)
@@ -81,6 +81,22 @@ env: {}
 # herdr:
 #   enabled: false                       # set to false to skip herdr CLI/skill
 #   agent: claude                        # HERDR_AGENT value: claude, gemini, codex
+
+# Claude Code state
+# Claude's auto-memory and session transcripts are kept in .rig/claude in the
+# project (git-ignored) so they survive container recreation. Enabled by default.
+# claude:
+#   persist_state: false                 # set to false to keep them in the container
+
+# Neovim, installed by default. With a config, it is cloned into the image and
+# pre-initialised: lazy.nvim plugins, Mason tools for the languages above (from
+# an NvChad mason.pkgs list) and treesitter parsers. Remove "config" for
+# Neovim's defaults, or set enabled: false to skip Neovim.
+neovim:
+  config:
+    repo: https://github.com/wfaler/arch-dotfiles.git  # https git URL
+    path: .config/nvim                   # directory in the repo (default: root)
+    ref: main                            # branch or tag (default: default branch)
 
 # VS Code in browser (code-server)
 # code_server:

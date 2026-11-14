@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -17,6 +19,8 @@ type Config struct {
 	CodeServer     *CodeServerConfig         `yaml:"code_server"`
 	MarkdownServer *MarkdownServerConfig     `yaml:"markdown_server"`
 	Herdr          *HerdrConfig              `yaml:"herdr"`
+	Claude         *ClaudeConfig             `yaml:"claude"`
+	Neovim         *NeovimConfig             `yaml:"neovim"`
 	Shell          string                    `yaml:"shell"` // bash (default), zsh, fish
 }
 
@@ -79,12 +83,9 @@ type MarkdownServerConfig struct {
 }
 
 // IsMarkdownServerEnabled returns true if the markdown server is enabled.
-// The markdown server is enabled by default unless explicitly disabled.
+// It is disabled by default and only runs when explicitly enabled.
 func (c *Config) IsMarkdownServerEnabled() bool {
-	if c.MarkdownServer == nil {
-		return true // enabled by default
-	}
-	return c.MarkdownServer.Enabled
+	return c.MarkdownServer != nil && c.MarkdownServer.Enabled
 }
 
 // GetMarkdownServerPort returns the markdown server port, defaulting to 3030
@@ -129,6 +130,90 @@ func (c *Config) GetHerdrAgent() string {
 		return DefaultHerdrAgent
 	}
 	return c.Herdr.Agent
+}
+
+// ClaudeConfig defines how Claude Code's own state is handled in the container.
+type ClaudeConfig struct {
+	// PersistState links Claude Code's per-project state (auto-memory and
+	// session transcripts) into the workspace so it survives container
+	// recreation. nil means "default" (enabled).
+	PersistState *bool `yaml:"persist_state"`
+}
+
+// IsClaudeStatePersisted reports whether Claude Code's per-project state
+// should be kept in the workspace. It is enabled by default unless explicitly
+// disabled.
+func (c *Config) IsClaudeStatePersisted() bool {
+	if c.Claude == nil || c.Claude.PersistState == nil {
+		return true // enabled by default
+	}
+	return *c.Claude.PersistState
+}
+
+// NeovimConfig defines whether Neovim is installed and which config it uses.
+type NeovimConfig struct {
+	Enabled *bool             `yaml:"enabled"` // nil means "default" (enabled)
+	Config  *NeovimConfigRepo `yaml:"config"`  // nil means Neovim's defaults
+}
+
+// NeovimConfigRepo locates a Neovim config in a git repository. It is cloned
+// into the image at build time, and its plugins and tools are pre-installed.
+type NeovimConfigRepo struct {
+	Repo string `yaml:"repo"` // https URL of the git repository
+	Path string `yaml:"path"` // directory within the repository (default: its root)
+	Ref  string `yaml:"ref"`  // branch or tag to check out (default: the default branch)
+}
+
+// safeGitWordPattern restricts a Neovim config ref or path to characters that
+// are safe in git arguments and shell words.
+var safeGitWordPattern = regexp.MustCompile(`^[A-Za-z0-9._/-]+$`)
+
+// IsNeovimEnabled reports whether Neovim should be installed. It is enabled by
+// default unless explicitly disabled.
+func (c *Config) IsNeovimEnabled() bool {
+	if c.Neovim == nil || c.Neovim.Enabled == nil {
+		return true // enabled by default
+	}
+	return *c.Neovim.Enabled
+}
+
+// GetNeovimConfigRepo returns the Neovim config repository to install, or nil
+// when Neovim is disabled or should run with its defaults.
+func (c *Config) GetNeovimConfigRepo() *NeovimConfigRepo {
+	if !c.IsNeovimEnabled() || c.Neovim == nil || c.Neovim.Config == nil {
+		return nil
+	}
+	return c.Neovim.Config
+}
+
+// validateNeovimConfigRepo checks a Neovim config repository. The values end
+// up as git arguments in the image build, so they are kept to safe forms.
+func validateNeovimConfigRepo(r *NeovimConfigRepo) error {
+	u, err := url.Parse(r.Repo)
+	if err != nil || u.Scheme != "https" || u.Host == "" || strings.ContainsAny(r.Repo, " \t\n'\"\\") {
+		return fmt.Errorf("neovim.config.repo must be an https git URL, got %q", r.Repo)
+	}
+	if r.Path != "" && !isSafeRelativePath(r.Path) {
+		return fmt.Errorf("neovim.config.path must be a relative path within the repository, got %q", r.Path)
+	}
+	if r.Ref != "" && (!safeGitWordPattern.MatchString(r.Ref) || strings.HasPrefix(r.Ref, "-") || strings.Contains(r.Ref, "..")) {
+		return fmt.Errorf("neovim.config.ref must be a branch or tag name, got %q", r.Ref)
+	}
+	return nil
+}
+
+// isSafeRelativePath reports whether p is a relative path that stays within
+// its root and contains only safe characters.
+func isSafeRelativePath(p string) bool {
+	if !safeGitWordPattern.MatchString(p) || strings.HasPrefix(p, "/") || strings.HasPrefix(p, "-") {
+		return false
+	}
+	for _, part := range strings.Split(p, "/") {
+		if part == ".." {
+			return false
+		}
+	}
+	return true
 }
 
 // GetAllPorts returns all configured ports, including code-server port if enabled
@@ -263,6 +348,13 @@ func (c *Config) Validate() error {
 	// Validate herdr agent
 	if c.Herdr != nil && c.Herdr.Agent != "" && !SupportedHerdrAgents[c.Herdr.Agent] {
 		return fmt.Errorf("unsupported herdr agent: %s (supported: claude, gemini, codex)", c.Herdr.Agent)
+	}
+
+	// Validate the Neovim config repository
+	if c.Neovim != nil && c.Neovim.Config != nil {
+		if err := validateNeovimConfigRepo(c.Neovim.Config); err != nil {
+			return err
+		}
 	}
 
 	return nil

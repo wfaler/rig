@@ -10,6 +10,16 @@ import (
 	"github.com/wfaler/rig/internal/herdr"
 )
 
+const (
+	// RigStateDir holds state rig keeps in the workspace so it survives
+	// container recreation. It contains a self-ignoring .gitignore.
+	RigStateDir = "/workspace/.rig"
+
+	// ClaudeStateDir is where Claude Code's per-project state (auto-memory
+	// and session transcripts) is kept.
+	ClaudeStateDir = RigStateDir + "/claude"
+)
+
 // TemplateData holds the data passed to the Dockerfile template
 type TemplateData struct {
 	LanguageInstalls     string
@@ -27,14 +37,26 @@ type TemplateData struct {
 	HerdrAgent           string
 	HerdrSocketPath      string
 	Shell                string
+	Neovim               bool
+	NeovimConfigClone    string
+	NeovimSetup          string
+	PersistClaudeState   bool
+	RigStateDir          string
+	ClaudeStateDir       string
 
 	// Install commands shared with the update script
-	AgentNPMPackages   string
-	MarkdownNPMPackage string
-	HerdrBinaryURL     string
-	HerdrSkillURL      string
-	CodeServerInstall  string
-	UpdateScriptPath   string
+	AgentNPMPackages       string
+	MarkdownNPMPackage     string
+	HerdrBinaryURL         string
+	HerdrSkillURL          string
+	HerdrBinPath           string
+	HerdrClaudeHookPath    string
+	HerdrClaudeHookInstall string
+	CodeServerInstall      string
+	NeovimInstall          string
+	NeovimAliases          string
+	NvimInitScriptPath     string
+	UpdateScriptPath       string
 }
 
 // BuildContext holds the Dockerfile and any extra files needed in the build context
@@ -70,27 +92,41 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 	}
 
 	data := TemplateData{
-		LanguageInstalls:     strings.Join(langInstalls, "\n\n"),
-		BuildSystemInstalls:  strings.Join(bsInstalls, "\n\n"),
-		HasNode:              cfg.HasLanguage("node"),
-		HasJava:              cfg.HasLanguage("java"),
-		Env:                  cfg.Env,
-		CodeServer:           cfg.IsCodeServerEnabled(),
-		CodeServerPort:       cfg.GetCodeServerPort(),
-		CodeServerTheme:      cfg.GetCodeServerTheme(),
-		CodeServerExtensions: extensions,
-		MarkdownServer:       cfg.IsMarkdownServerEnabled(),
-		MarkdownServerPort:   cfg.GetMarkdownServerPort(),
-		Herdr:                cfg.IsHerdrEnabled(),
-		HerdrAgent:           cfg.GetHerdrAgent(),
-		HerdrSocketPath:      herdr.ContainerSocketPath,
-		Shell:                cfg.GetShell(),
-		AgentNPMPackages:     agentNPMPackages,
-		MarkdownNPMPackage:   markdownNPMPackage,
-		HerdrBinaryURL:       herdrBinaryURL,
-		HerdrSkillURL:        herdrSkillURL,
-		CodeServerInstall:    codeServerInstall,
-		UpdateScriptPath:     UpdateScriptPath,
+		LanguageInstalls:       strings.Join(langInstalls, "\n\n"),
+		BuildSystemInstalls:    strings.Join(bsInstalls, "\n\n"),
+		HasNode:                cfg.HasLanguage("node"),
+		HasJava:                cfg.HasLanguage("java"),
+		Env:                    cfg.Env,
+		CodeServer:             cfg.IsCodeServerEnabled(),
+		CodeServerPort:         cfg.GetCodeServerPort(),
+		CodeServerTheme:        cfg.GetCodeServerTheme(),
+		CodeServerExtensions:   extensions,
+		MarkdownServer:         cfg.IsMarkdownServerEnabled(),
+		MarkdownServerPort:     cfg.GetMarkdownServerPort(),
+		Herdr:                  cfg.IsHerdrEnabled(),
+		HerdrAgent:             cfg.GetHerdrAgent(),
+		HerdrSocketPath:        herdr.ContainerSocketPath,
+		Shell:                  cfg.GetShell(),
+		Neovim:                 cfg.IsNeovimEnabled(),
+		PersistClaudeState:     cfg.IsClaudeStatePersisted(),
+		RigStateDir:            RigStateDir,
+		ClaudeStateDir:         ClaudeStateDir,
+		AgentNPMPackages:       agentNPMPackages,
+		MarkdownNPMPackage:     markdownNPMPackage,
+		HerdrBinaryURL:         herdrBinaryURL,
+		HerdrSkillURL:          herdrSkillURL,
+		HerdrBinPath:           herdr.ContainerBinPath,
+		HerdrClaudeHookPath:    HerdrClaudeHookPath,
+		HerdrClaudeHookInstall: herdrClaudeHookInstall,
+		CodeServerInstall:      codeServerInstall,
+		NeovimInstall:          neovimInstall,
+		NeovimAliases:          neovimAliases(vimAliasDir, NvimBinPath),
+		NvimInitScriptPath:     NvimInitScriptPath,
+		UpdateScriptPath:       UpdateScriptPath,
+	}
+	if repo := cfg.GetNeovimConfigRepo(); repo != nil {
+		data.NeovimConfigClone = neovimConfigClone(repo)
+		data.NeovimSetup = neovimSetup(cfg, false)
 	}
 
 	tmpl, err := template.New("dockerfile").Parse(BaseTemplate)
@@ -120,6 +156,11 @@ func Generate(cfg *config.Config) (*BuildContext, error) {
 
 	if cfg.IsHerdrEnabled() {
 		ctx.ExtraFiles["rig-sandbox-skill.md"] = []byte(rigSandboxSkill)
+		ctx.ExtraFiles[herdrClaudeHookFile] = []byte(herdrClaudeHook)
+	}
+
+	if cfg.GetNeovimConfigRepo() != nil {
+		ctx.ExtraFiles[nvimInitScriptFile] = []byte(nvimInitScript)
 	}
 
 	return ctx, nil

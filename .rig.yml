@@ -79,3 +79,10 @@ code_server:
 #     - rust-lang.rust-analyzer
 #     # Ruby
 #     - shopify.ruby-lsp
+
+# Neovim with a pre-initialised config (plugins, Mason tools, parsers)
+neovim:
+  config:
+    repo: https://github.com/wfaler/arch-dotfiles.git
+    path: .config/nvim
+    ref: main

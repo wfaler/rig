@@ -89,7 +89,7 @@ A built-in markdown server renders `.md` files from the workspace as navigable H
 - Mermaid diagram rendering (loaded from CDN on demand)
 - Breadcrumb navigation showing the file's repo-relative path
 
-Enabled by default on port 3030. No configuration required.
+Disabled by default. Enable with `markdown_server.enabled: true`; serves on port 3030 unless configured otherwise.
 
 ### Code Server (VS Code in Browser)
 
@@ -138,7 +138,8 @@ code_server:
     - github.copilot
 
 markdown_server:
-  port: 3030               # enabled by default
+  enabled: true            # disabled by default
+  port: 3030
 ```
 
 ## Planned Capabilities
